@@ -35,8 +35,7 @@ export function insertModes(cs: Cells, i: number): Record<Mode, Slot | null> {
   const d = cs[i].depth
   const end = subtreeEnd(cs, i)
   const kids = end > i + 1
-  if (kids && !cs[i].collapsed)
-    return { same: { index: i + 1, depth: d + 1 }, in: null, out: null }
+  if (kids && !cs[i].collapsed) return { same: { index: i + 1, depth: d + 1 }, in: null, out: null }
   const lastInGroup = d > 0 && (end === cs.length || cs[end].depth < d)
   return {
     same: { index: end, depth: d },
@@ -87,7 +86,7 @@ export function indent(cs: Cells, i: number): Cells {
 export function outdent(cs: Cells, i: number): Cells {
   if (cs[i].depth === 0) return cs
   return produce(shift(cs, i, -1), (draft) => {
-    draft[i].collapsed = false
+    draft[i].collapsed = false // adopted siblings must not vanish
   })
 }
 

@@ -41,12 +41,12 @@ body {
   border: 0;
   outline: none;
 }
-.title {
+.titlebar .title {
   flex: 1;
   min-width: 0;
   padding: 0 4px;
-  color: #fff !important;
-  font-weight: bold !important;
+  color: #fff;
+  font-weight: bold;
 }
 .lang {
   color: #cccccc;

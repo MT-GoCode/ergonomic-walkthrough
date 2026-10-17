@@ -28,5 +28,12 @@ export default defineConfig(
       ...eslintPluginReactRefresh.configs.vite.rules
     }
   },
+  // Inferred return types are the house style; explicit ones only add lines.
+  { rules: { '@typescript-eslint/explicit-function-return-type': 'off' } },
+  // Playwright fixtures require `{}` destructuring and a `use` callback that is not a React hook.
+  {
+    files: ['tests/**'],
+    rules: { 'no-empty-pattern': 'off', 'react-hooks/rules-of-hooks': 'off' }
+  },
   eslintConfigPrettier
 )

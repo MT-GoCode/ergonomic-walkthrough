@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef } from 'react'
+import { useEffect, useReducer } from 'react'
 import { serializeDoc } from '../../shared/doc'
 import type { Command } from '../../shared/ipc'
 import { DEFAULT_SETTINGS as S } from '../../shared/settings'
@@ -7,9 +7,6 @@ import { DispatchCtx, reducer } from './state'
 
 export function App(): React.JSX.Element {
   const [s, dispatch] = useReducer(reducer, { cells: [], focusId: null, rev: 0 })
-  const cells = useRef(s.cells)
-  cells.current = s.cells
-  const pending = useRef(false)
 
   useEffect(() => {
     const root = document.documentElement.style
@@ -20,20 +17,19 @@ export function App(): React.JSX.Element {
     window.api.onCommand((c: Command) => {
       switch (c.t) {
         case 'cellMenu':
-          return dispatch({ a: c.op === 'delete' ? 'remove' : 'removeIndented', id: c.id })
+          return dispatch({ a: c.op, id: c.id })
+        default:
+          return c.t satisfies never
       }
     })
   }, [])
 
   // rev counts user edits only, so loading a doc never pushes. At most one push per frame.
   useEffect(() => {
-    if (!s.rev || pending.current) return
-    pending.current = true
-    requestAnimationFrame(() => {
-      pending.current = false
-      window.api.docChanged(serializeDoc(cells.current))
-    })
-  }, [s.rev])
+    if (!s.rev) return
+    const frame = requestAnimationFrame(() => window.api.docChanged(serializeDoc(s.cells)))
+    return () => cancelAnimationFrame(frame)
+  }, [s.rev, s.cells])
 
   return (
     <DispatchCtx.Provider value={dispatch}>

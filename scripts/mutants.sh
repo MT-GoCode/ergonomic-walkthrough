@@ -2,13 +2,18 @@
 # Mutation check: each mutant must turn the unit suite red. Usage: scripts/mutants.sh
 cd "$(dirname "$0")/.." || exit 1
 fail=0
+bak=$(mktemp)
+file=
+trap '[ -n "$file" ] && cp "$bak" "$file"' EXIT INT TERM
 mutate() { # file, perl substitution, description
-  cp "$1" /tmp/mutant.bak
+  file=$1
+  cp "$1" "$bak"
   perl -0pi -e "$2" "$1"
-  if cmp -s "$1" /tmp/mutant.bak; then echo "NOT APPLIED: $3"; fail=1
+  if cmp -s "$1" "$bak"; then echo "NOT APPLIED: $3"; fail=1
   elif npx playwright test --project=unit -x --reporter=dot >/dev/null 2>&1; then echo "SURVIVED: $3"; fail=1
   else echo "killed: $3"; fi
-  cp /tmp/mutant.bak "$1"
+  cp "$bak" "$1"
+  file=
 }
 O=src/shared/ops.ts; D=src/shared/doc.ts
 mutate $O 's/if \(kids && !cs\[i\]\.collapsed\)/if (false)/' 'open parent treated as leaf'
@@ -25,6 +30,7 @@ mutate $O 's/subtreeEnd\(cs, i\) > i \+ 1\n    \?/true\n    ?/' 'toggle on leave
 mutate $O 's/hideBelow = c\.collapsed && subtreeEnd\(cs, i\) > i \+ 1 \? c\.depth : Infinity/if (c.collapsed) hideBelow = c.depth/' 'hideBelow never resets'
 mutate $O 's/\[A-Za-z\]\[A-Za-z0-9\]\*/[A-Za-z0-9]+/' 'numeric extensions match'
 mutate $O 's/l\.filter\(\(l\) => l\.trim\(\)\)/l.filter(() => true)/; s/lines\.filter\(\(l\) => l\.trim\(\)\)/lines.filter(() => true)/' 'dedent counts blank lines'
+mutate $O 's/draft\[i\]\.collapsed = false \/\/ adopted siblings must not vanish/void 0/' 'outdent leaves adopted siblings hidden'
 mutate $D 's/cells: z\.array\(Cell\)\.min\(1\)/cells: z.array(Cell)/' 'empty doc accepted'
 mutate $D 's/const max = i === 0 \? 0 : cells\[i - 1\]\.depth \+ 1/const max = i === 0 ? 0 : cells[i - 1].depth + 2/' 'depth jump accepted'
 mutate $D 's/ids\.has\(c\.id\)/false/' 'duplicate ids accepted'

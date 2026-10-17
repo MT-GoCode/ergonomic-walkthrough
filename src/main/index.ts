@@ -6,19 +6,22 @@ if (process.env.WT_USER_DATA) app.setPath('userData', process.env.WT_USER_DATA)
 
 // Links in rendered markdown open in the browser; the app window never navigates away.
 app.on('web-contents-created', (_e, wc) => {
+  const external = (url: string) => {
+    if (['http:', 'https:', 'mailto:'].includes(new URL(url).protocol)) shell.openExternal(url)
+  }
   wc.on('will-navigate', (e, url) => {
     e.preventDefault()
-    shell.openExternal(url)
+    external(url)
   })
   wc.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
+    external(url)
     return { action: 'deny' }
   })
 })
 
 const cellMenu: [CellMenuOp, string][] = [
-  ['delete', 'Delete'],
-  ['deleteIndented', 'Delete with indented below']
+  ['remove', 'Delete'],
+  ['removeIndented', 'Delete with indented below']
 ]
 
 app.whenReady().then(() => {

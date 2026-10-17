@@ -7,7 +7,7 @@ export const CH = {
   command: 'wt:command'
 } as const
 
-export type CellMenuOp = 'delete' | 'deleteIndented'
+export type CellMenuOp = 'remove' | 'removeIndented'
 
 // main → renderer
 export type Command = { t: 'cellMenu'; id: string; op: CellMenuOp }

@@ -15,12 +15,17 @@ export type Action =
 
 const blank = (): Cell => newCell('code', 0, DEFAULT_SETTINGS.defaultLang)
 
-function edit(cells: Cell[], act: Exclude<Action, { a: 'init' | 'focus' }>): [Cell[], string | null] {
+// Returns the next cells and the next focused id.
+function edit(
+  cells: Cell[],
+  act: Exclude<Action, { a: 'init' | 'focus' }>,
+  focusId: string | null
+): [Cell[], string | null] {
   const i = cells.findIndex((c) => c.id === act.id)
   switch (act.a) {
     case 'insert': {
       const slot = ops.insertModes(cells, i)[act.mode]
-      if (!slot) return [cells, null]
+      if (!slot) return [cells, focusId]
       const cell = newCell(act.kind, slot.depth, DEFAULT_SETTINGS.defaultLang)
       return [ops.insert(cells, i, slot, cell), cell.id]
     }
@@ -48,9 +53,13 @@ function edit(cells: Cell[], act: Exclude<Action, { a: 'init' | 'focus' }>): [Ce
 export function reducer(s: State, act: Action): State {
   if (act.a === 'init') return { cells: act.cells, focusId: null, rev: 0 }
   if (act.a === 'focus') return { ...s, focusId: act.id }
-  const [cells, focusId] = edit(s.cells, act)
-  return cells === s.cells ? s : { cells, focusId: focusId ?? s.focusId, rev: s.rev + 1 }
+  const [cells, focusId] = edit(s.cells, act, s.focusId)
+  return cells === s.cells ? s : { cells, focusId, rev: s.rev + 1 }
 }
 
-export const DispatchCtx = createContext<Dispatch<Action>>(() => {})
-export const useDispatch = (): Dispatch<Action> => useContext(DispatchCtx)
+export const DispatchCtx = createContext<Dispatch<Action> | null>(null)
+export const useDispatch = (): Dispatch<Action> => {
+  const d = useContext(DispatchCtx)
+  if (!d) throw new Error('useDispatch outside DispatchCtx.Provider')
+  return d
+}

@@ -11,7 +11,10 @@ import { useDispatch } from './state'
 export function MdBody({ cell }: { cell: Extract<Cell, { kind: 'md' }> }): React.JSX.Element {
   const dispatch = useDispatch()
   const [editing, setEditing] = useState(false)
-  const onChange = useCallback((text: string) => dispatch({ a: 'body', id: cell.id, text }), [dispatch, cell.id])
+  const onChange = useCallback(
+    (text: string) => dispatch({ a: 'body', id: cell.id, text }),
+    [dispatch, cell.id]
+  )
   const extensions = useMemo(
     () => [
       EditorView.lineWrapping,

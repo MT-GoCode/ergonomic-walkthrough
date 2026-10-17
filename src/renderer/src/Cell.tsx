@@ -6,7 +6,7 @@ import { MdBody } from './MdBody'
 import { useDispatch } from './state'
 
 const LANGS = languages.map((l) => l.name).sort((a, b) => a.localeCompare(b))
-const LANG_SET = new Set(LANGS)
+const LANG_BY_LOWER = new Map(LANGS.map((n) => [n.toLowerCase(), n]))
 
 // One datalist shared by every cell: per-cell option lists would put 143 × cells
 // nodes in the DOM, and style recalc over them dominates opening a large trace.
@@ -30,16 +30,22 @@ function LangInput({ id, lang }: { id: string; lang: string }): React.JSX.Elemen
       value={draft ?? lang}
       onFocus={(e) => e.currentTarget.select()}
       onChange={(e) => {
-        const v = e.target.value
-        if (LANG_SET.has(v)) dispatch({ a: 'lang', id, text: v })
-        setDraft(LANG_SET.has(v) ? null : v)
+        const name = LANG_BY_LOWER.get(e.target.value.toLowerCase())
+        if (name) dispatch({ a: 'lang', id, text: name })
+        setDraft(name ? null : e.target.value)
       }}
       onBlur={() => setDraft(null)}
     />
   )
 }
 
-export const CellView = memo(function CellView({ cell, focused }: { cell: Cell; focused: boolean }) {
+export const CellView = memo(function CellView({
+  cell,
+  focused
+}: {
+  cell: Cell
+  focused: boolean
+}) {
   const dispatch = useDispatch()
   const id = cell.id
   return (

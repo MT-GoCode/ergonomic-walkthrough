@@ -33,7 +33,11 @@ export const Doc = z
     cells.forEach((c, i) => {
       const max = i === 0 ? 0 : cells[i - 1].depth + 1
       if (c.depth > max)
-        ctx.addIssue({ code: 'custom', path: ['cells', i, 'depth'], message: `depth must be <= ${max}` })
+        ctx.addIssue({
+          code: 'custom',
+          path: ['cells', i, 'depth'],
+          message: `depth must be <= ${max}`
+        })
       if (ids.has(c.id))
         ctx.addIssue({ code: 'custom', path: ['cells', i, 'id'], message: 'duplicate id' })
       ids.add(c.id)

@@ -11,7 +11,9 @@ const metrics = EditorView.theme({
   '&.cm-focused': { outline: 'none' }
 })
 const dark = (background: string) => [
-  vscodeDarkInit({ settings: { background, gutterBackground: background, fontFamily: 'var(--font)' } }),
+  vscodeDarkInit({
+    settings: { background, gutterBackground: background, fontFamily: 'var(--font)' }
+  }),
   metrics
 ]
 export const codeTheme = dark('#000000')

@@ -13,7 +13,11 @@ export const test = base.extend<{ launch: (files?: string[]) => Promise<Launched
     await use(async (files = []) => {
       const app = await _electron.launch({
         args: [join(ROOT, 'out/main/index.js'), ...files],
-        env: { ...process.env, WT_SHOW_INACTIVE: '1', WT_USER_DATA: info.outputPath(`userdata-${apps.length}`) }
+        env: {
+          ...process.env,
+          WT_SHOW_INACTIVE: '1',
+          WT_USER_DATA: info.outputPath(`userdata-${apps.length}`)
+        }
       })
       apps.push(app)
       await app.context().tracing.start({ screenshots: true, snapshots: true })
@@ -30,7 +34,9 @@ export const test = base.extend<{ launch: (files?: string[]) => Promise<Launched
 export { expect } from '@playwright/test'
 
 // Records every doc the renderer pushes to main; returns a getter for the latest.
-export async function recordPushes(app: ElectronApplication): Promise<() => Promise<string | undefined>> {
+export async function recordPushes(
+  app: ElectronApplication
+): Promise<() => Promise<string | undefined>> {
   await app.evaluate(({ ipcMain }) => {
     const g = globalThis as unknown as { pushes: string[] }
     g.pushes = []

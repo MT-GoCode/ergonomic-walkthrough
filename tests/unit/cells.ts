@@ -5,7 +5,9 @@ export const mk = (...specs: string[]): Cell[] =>
   specs.map((s) => {
     const [, k, d, title, plus] = /^([cm])(\d) (\S+?)(\+?)$/.exec(s)!
     const common = { id: title, depth: +d, title, body: '', collapsed: plus === '+' }
-    return k === 'c' ? { ...common, kind: 'code', lang: 'Python' } : { ...common, kind: 'md', height: 'fit' }
+    return k === 'c'
+      ? { ...common, kind: 'code', lang: 'Python' }
+      : { ...common, kind: 'md', height: 'fit' }
   })
 
 export const shape = (cs: Cell[]): string[] =>
