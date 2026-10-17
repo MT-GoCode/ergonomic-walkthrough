@@ -1,9 +1,14 @@
 import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron'
 import { CH, type CellMenuOp, type Command } from '../shared/ipc'
 import { settingsItem } from './settings'
-import { fileMenu, newWindow, openInitial } from './windows'
+import { fileMenu, newWindow, openInitial, openPaths } from './windows'
 
 if (process.env.WT_USER_DATA) app.setPath('userData', process.env.WT_USER_DATA)
+
+// One instance per userData: two would both rewrite session.json. A second launch hands its
+// files to the first and exits without running quit handlers (which would save a session).
+if (!app.requestSingleInstanceLock()) app.exit(0)
+app.on('second-instance', (_e, argv) => openPaths(argv.filter((a) => a.endsWith('.walkthrough'))))
 
 // Links in rendered markdown open in the browser; the app window never navigates away.
 app.on('web-contents-created', (_e, wc) => {

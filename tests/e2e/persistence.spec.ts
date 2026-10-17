@@ -7,7 +7,7 @@ import {
   readFileSync,
   writeFileSync
 } from 'fs'
-import { join } from 'path'
+import { basename, join } from 'path'
 import type { ElectronApplication, Page } from '@playwright/test'
 import { parseDoc, serializeDoc } from '../../src/shared/doc'
 import { click, expect, FIXTURE, recordPushes, test, winId } from './app'
@@ -111,8 +111,14 @@ test('quit and relaunch restores every window with its doc, bounds and dirty sta
   await expect.poll(() => again.windows().length).toBe(2)
   await Promise.all(again.windows().map(loaded))
   const after = await windows(again)
-  expect(after.map(({ title, edited, bounds }) => ({ title, edited, bounds }))).toEqual(
-    before.map(({ title, edited, bounds }) => ({ title, edited, bounds }))
+  expect(after.map(({ title, edited }) => ({ title, edited }))).toEqual(
+    before.map(({ title, edited }) => ({ title, edited }))
+  )
+  // macOS may nudge a restored window by a pixel to keep it on screen (seen on CI displays).
+  after.forEach((w, i) =>
+    (['x', 'y', 'width', 'height'] as const).forEach((k) =>
+      expect(Math.abs(w.bounds[k] - before[i].bounds[k]), `${w.title} ${k}`).toBeLessThanOrEqual(1)
+    )
   )
   expect(after[0].text).toContain('MARK_B')
   expect(after[1].text).toContain('MARK_A')
@@ -146,7 +152,7 @@ test('an opened or new window writes no autosave until it is edited (kills: auto
   await expect.poll(() => autosaves(ud).length).toBe(1)
 })
 
-test('two windows first edited in the same second get two autosave files (kills: name without the window uuid)', async ({
+test('two windows first edited in the same second get two autosave files, each with its own text (kills: name without the random suffix)', async ({
   launch
 }, info) => {
   const ud = info.outputPath('ud')
@@ -154,13 +160,71 @@ test('two windows first edited in the same second get two autosave files (kills:
   const other = await loaded(
     (await Promise.all([app.waitForEvent('window'), click(app, 'newWindow')]))[0]
   )
-  await app.evaluate(() => void (Date.now = () => 1_760_000_000_000))
-  await typeIn(page, 'a')
-  await typeIn(other, 'b')
+  // Freeze main's clock so both autosave names get the same timestamp.
+  await app.evaluate(() => {
+    const Real = Date
+    globalThis.Date = class extends Real {
+      constructor(...a: []) {
+        super(...(a.length ? a : [1_760_000_000_000]))
+      }
+    } as DateConstructor
+  })
+  await typeIn(page, 'WINDOW_A')
+  await typeIn(other, 'WINDOW_B')
   await expect.poll(() => autosaves(ud).length).toBe(2)
   const [x, y] = autosaves(ud)
   expect(x.slice(0, 19)).toBe(y.slice(0, 19))
   expect(x).toMatch(/^\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d-[0-9a-f]{6}\.walkthrough$/)
+  await expect
+    .poll(() =>
+      [x, y]
+        .map((f) =>
+          readFileSync(join(ud, 'autosaves', f), 'utf8')
+            .match(/WINDOW_[AB]/g)
+            ?.join()
+        )
+        .sort()
+    )
+    .toEqual(['WINDOW_A', 'WINDOW_B'])
+})
+
+test('an autosave opened from its folder is focused if open, else adopted as untitled and kept as its file (kills: adoption / dedupe)', async ({
+  launch
+}, info) => {
+  const ud = info.outputPath('ud')
+  const { app, page } = await launch([], ud)
+  await typeIn(page, 'FIRST')
+  await expect.poll(() => autosaves(ud).length).toBe(1)
+  const path = join(ud, 'autosaves', autosaves(ud)[0])
+  await open(app, path)
+  expect(await count(app)).toBe(1)
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].destroy())
+  const adopted = await openNew(app, path)
+  expect((await windows(app)).map((w) => w.title)).toEqual(['Untitled'])
+  await typeIn(adopted, 'SECOND')
+  await expect.poll(() => readFileSync(path, 'utf8')).toContain('SECOND')
+  expect(autosaves(ud)).toEqual([basename(path)])
+})
+
+test('a session entry whose file and autosave are both gone is reported, and a fresh window opens (kills: silent skip)', async ({
+  launch
+}, info) => {
+  test.skip(!!process.env.WT_EXECUTABLE, 'error-box preload needs the dev runner')
+  const ud = info.outputPath('ud')
+  const { app } = await launch([], ud)
+  await quit(app)
+  const gone = info.outputPath('gone.walkthrough')
+  writeFileSync(
+    join(ud, 'session.json'),
+    JSON.stringify([
+      { autosavePath: null, filePath: gone, bounds: { x: 0, y: 0, width: 700, height: 600 } }
+    ])
+  )
+  const again = await launch([], ud, { stubErrorBox: true })
+  expect(
+    await again.app.evaluate(() => (globalThis as unknown as { errorBoxes: string[] }).errorBoxes)
+  ).toEqual([`Cannot open ${gone}`])
+  expect((await windows(again.app)).map((w) => w.title)).toEqual(['Untitled'])
 })
 
 test('Save As writes exactly the pushed doc, clears dirty, and an edit sets it again (kills: stale json written / saved text not recorded)', async ({
@@ -196,7 +260,8 @@ test('closing a dirty saved file prompts and Cancel keeps it; an untitled window
   const close = () =>
     app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().forEach((w) => w.close()))
   await close()
-  expect((await calls(app)).length).toBe(1)
+  // Closing flushes the renderer before it prompts, so the prompt arrives asynchronously.
+  await expect.poll(async () => (await calls(app)).length).toBe(1)
   expect(await count(app)).toBe(1)
 
   await app.evaluate(() => void ((globalThis as unknown as G).answer = 1))
@@ -354,4 +419,16 @@ test('if Save in the close prompt fails, the error shows and the window stays op
   } finally {
     chmodSync(dir, 0o755)
   }
+})
+
+test('a window closed before its page has loaded closes at once (kills: flush awaits a page that is not listening)', async ({
+  launch
+}) => {
+  const { app } = await launch()
+  await app.evaluate(({ BrowserWindow, Menu }) => {
+    Menu.getApplicationMenu()!.getMenuItemById('newWindow')!.click()
+    const all = BrowserWindow.getAllWindows()
+    all.sort((a, b) => b.id - a.id)[0].close()
+  })
+  await expect.poll(() => count(app)).toBe(1)
 })

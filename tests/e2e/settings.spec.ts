@@ -76,6 +76,8 @@ test('an invalid value is marked and never sent (kills: unvalidated setSettings)
   await expect(page.locator('input[name=fontSize]')).toHaveClass(/invalid/)
   expect(await sent()).toBe(0)
   await page.locator('input[name=fontSize]').fill('14')
+  expect(await sent()).toBe(0)
+  await page.keyboard.press('Enter')
   await expect.poll(sent).toBe(1)
   await expect
     .poll(() => page.evaluate(() => getComputedStyle(document.body).fontSize))

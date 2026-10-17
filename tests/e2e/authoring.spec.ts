@@ -111,7 +111,7 @@ test('the markdown handle drags in whole lines between 1 and the window, double 
   let s = await m()
   expect(s.h + s.title).toBeLessThanOrEqual(s.win)
   expect(s.h + s.lh + s.title).toBeGreaterThan(s.win)
-  expect((s.h / s.lh) % 1).toBeCloseTo(0, 1)
+  expect(Math.abs(s.h / s.lh - Math.round(s.h / s.lh))).toBeLessThan(0.05)
   await drag(-10000)
   s = await m()
   expect(s.h).toBeCloseTo(s.lh, 0)
@@ -184,6 +184,8 @@ test('⋯ → Delete with indented below removes exactly that subtree (kills: po
   })
   await (await cellTitled(page, '__init__.py:743 resolve task')).locator('.more').click()
   await expect(page.locator('.cell')).toHaveCount(17)
+  // The keyboard lands on the cell just above the deleted one (an untitled markdown note).
+  await expect.poll(() => where(page)).toBe('#2:title')
   expect(
     await page.$$eval('.cell .title', (t) => t.map((e) => (e as HTMLInputElement).value))
   ).not.toContain('__init__.py:131 SUPPORTED_TASKS')

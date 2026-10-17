@@ -10,8 +10,8 @@ const FIELDS: Field[] = [
   { key: 'cols', label: 'Cell width (characters)', type: 'number' }
 ]
 
-// Every keystroke applies live to all windows if the whole form is valid; an invalid
-// field is marked and nothing is sent until it is fixed.
+// Applies to all windows when committed and the whole form is valid; an invalid field is
+// marked and nothing is sent until it is fixed.
 export function SettingsModal({ settings, close }: { settings: Settings; close: () => void }) {
   const [draft, setDraft] = useState<Record<keyof Settings, string>>(() => ({
     defaultLang: settings.defaultLang,
@@ -29,15 +29,16 @@ export function SettingsModal({ settings, close }: { settings: Settings; close: 
     })
   const parsed = parse(draft)
   const bad = new Set(parsed.success ? [] : parsed.error.issues.map((i) => i.path[0]))
-  const change = (key: keyof Settings, value: string) => {
-    const next = { ...draft, [key]: value }
-    setDraft(next)
-    const ok = parse(next)
-    if (ok.success) window.api.setSettings(ok.data)
-  }
+  // Committed on Enter, blur or close, not per keystroke: retyping 88 → 100 must not lay
+  // every window out at width 1 on the way.
+  const commit = () => parsed.success && window.api.setSettings(parsed.data)
+  const done = () => (commit(), close())
   return (
-    <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()}>
-      <div className="settings" onKeyDown={(e) => e.key === 'Escape' && close()}>
+    <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && done()}>
+      <div
+        className="settings"
+        onKeyDown={(e) => (e.key === 'Escape' ? done() : e.key === 'Enter' && commit())}
+      >
         <div className="settings-title">Settings</div>
         {FIELDS.map((f, i) => (
           <label key={f.key}>
@@ -50,7 +51,8 @@ export function SettingsModal({ settings, close }: { settings: Settings; close: 
               spellCheck={false}
               className={bad.has(f.key) ? 'invalid' : undefined}
               value={draft[f.key]}
-              onChange={(e) => change(f.key, e.target.value)}
+              onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })}
+              onBlur={commit}
             />
           </label>
         ))}

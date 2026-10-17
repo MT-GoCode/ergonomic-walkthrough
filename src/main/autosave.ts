@@ -1,6 +1,6 @@
 import { app, dialog } from 'electron'
 import { mkdirSync } from 'fs'
-import { rename, unlink, writeFile } from 'fs/promises'
+import { rename, rm, writeFile } from 'fs/promises'
 import { join } from 'path'
 
 // Lazy: index.ts redirects userData after this module is imported.
@@ -21,11 +21,14 @@ export class Autosave {
     return instances.get(path)!
   }
 
-  static create(uuid: string): Autosave {
+  // The random suffix keeps names unique even for windows first edited in the same second.
+  static create(): Autosave {
     mkdirSync(autosaveDir(), { recursive: true })
     // sv-SE formats local time as "YYYY-MM-DD HH:MM:SS".
     const stamp = new Date().toLocaleString('sv-SE').replace(' ', '_').replaceAll(':', '-')
-    return Autosave.at(join(autosaveDir(), `${stamp}-${uuid.slice(0, 6)}.walkthrough`))
+    return Autosave.at(
+      join(autosaveDir(), `${stamp}-${crypto.randomUUID().slice(0, 6)}.walkthrough`)
+    )
   }
 
   push(json: string): void {
@@ -41,7 +44,8 @@ export class Autosave {
     this.pending = null
     await this.flush()
     instances.delete(this.path)
-    await unlink(this.path)
+    // Gone already is fine: the user may have cleaned the folder, or the first write failed.
+    await rm(this.path, { force: true })
   }
 
   private async drain(): Promise<void> {

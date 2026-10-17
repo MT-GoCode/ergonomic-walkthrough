@@ -3,6 +3,7 @@ import {
   BrowserWindow,
   dialog,
   ipcMain,
+  screen,
   shell,
   type MenuItemConstructorOptions,
   type Rectangle
@@ -17,10 +18,11 @@ import { current } from './settings'
 import { readSession, writeSession, type Entry } from './session'
 
 // Main is the single owner of window state. `file.saved` is the text on disk, or null when
-// the file is gone, which leaves the window dirty until it is saved again.
+// the file is gone, which leaves the window dirty until it is saved again. `live` is true
+// once the page has asked for its doc: only then can it hold edits or answer a flush.
 type W = {
   win: BrowserWindow
-  uuid: string
+  live: boolean
   json: string
   autosave: Autosave | null
   file: { path: string; saved: string | null } | null
@@ -69,7 +71,7 @@ const flushes = new Map<number, { wc: number; done: () => void }>()
 let flushSeq = 0
 function flush(w: W): Promise<void> {
   const wc = w.win.webContents
-  if (wc.isDestroyed() || wc.isCrashed()) return Promise.resolve()
+  if (!w.live || wc.isDestroyed() || wc.isCrashed()) return Promise.resolve()
   return new Promise((done) => {
     const n = ++flushSeq
     flushes.set(n, { wc: wc.id, done })
@@ -81,27 +83,37 @@ ipcMain.on(CH.flushed, (_e, n: number) => {
   flushes.delete(n)
 })
 
-ipcMain.handle(CH.init, (e) => ({
-  doc: JSON.parse(ofWin(BrowserWindow.fromWebContents(e.sender))!.json),
-  settings: current()
-}))
+ipcMain.handle(CH.init, (e) => {
+  const w = ofWin(BrowserWindow.fromWebContents(e.sender))!
+  w.live = true
+  return { doc: JSON.parse(w.json), settings: current() }
+})
 ipcMain.on(CH.docChanged, (e, json: string) => {
   const w = ofWin(BrowserWindow.fromWebContents(e.sender))!
   w.json = json
   if (!w.autosave) {
-    w.autosave = Autosave.create(w.uuid)
+    w.autosave = Autosave.create()
     saveSession()
   }
   w.autosave.push(json)
   w.win.setDocumentEdited(dirty(w))
 })
 
-function createWindow(state: Omit<W, 'win' | 'uuid'>, bounds?: Rectangle): void {
+// Saved bounds are kept only if they still touch a display (a monitor may be gone).
+const onScreen = (b: Rectangle): boolean =>
+  screen
+    .getAllDisplays()
+    .some(
+      ({ workArea: a }) =>
+        b.x < a.x + a.width && a.x < b.x + b.width && b.y < a.y + a.height && a.y < b.y + b.height
+    )
+
+function createWindow(state: Omit<W, 'win' | 'live'>, bounds?: Rectangle): void {
   // 800px fits 88ch + 4 indent levels of Menlo 12 (7.22px/ch) plus the window frame.
   const win = new BrowserWindow({
     width: 800,
     height: 900,
-    ...bounds,
+    ...(bounds && onScreen(bounds) ? bounds : {}),
     show: false,
     backgroundColor: '#000000',
     webPreferences: {
@@ -113,18 +125,20 @@ function createWindow(state: Omit<W, 'win' | 'uuid'>, bounds?: Rectangle): void 
       backgroundThrottling: false
     }
   })
-  const w: W = { win, uuid: crypto.randomUUID(), ...state }
+  const w: W = { win, live: false, ...state }
   wins.set(win.id, w)
   present(w)
   if (w.file) app.addRecentDocument(w.file.path)
   win.on('page-title-updated', (e) => e.preventDefault())
+  win.webContents.on('did-start-loading', () => (w.live = false))
   win.webContents.on('render-process-gone', () =>
     flushes.forEach((f, n) => f.wc === win.webContents.id && (f.done(), flushes.delete(n)))
   )
   win.on('close', (e) => {
     if (quitting) return
     e.preventDefault()
-    void flush(w).then(async () => {
+    void guarded(`Cannot close ${w.file ? basename(w.file.path) : 'Untitled'}`, async () => {
+      await flush(w)
       if (dirty(w)) {
         const choice = dialog.showMessageBoxSync(win, {
           type: 'warning',
@@ -158,6 +172,12 @@ function createWindow(state: Omit<W, 'win' | 'uuid'>, bounds?: Rectangle): void 
 
 // Content is the autosave when one exists, otherwise the file; dirty is their difference.
 function openEntry({ autosavePath, filePath }: Paths, bounds?: Rectangle): void {
+  // A document already open in a window is focused there, never opened twice.
+  const open = [...wins.values()].find(
+    (w) =>
+      (filePath && w.file?.path === filePath) || (autosavePath && w.autosave?.path === autosavePath)
+  )
+  if (open) return open.win.focus()
   void guarded(`Cannot open ${filePath ?? autosavePath ?? 'window'}`, () => {
     const auto = read(autosavePath)
     const saved = read(filePath)
@@ -183,18 +203,18 @@ function openEntry({ autosavePath, filePath }: Paths, bounds?: Rectangle): void 
 
 function openPath(path: string): void {
   const p = resolve(path)
-  const open = [...wins.values()].find((w) => w.file?.path === p || w.autosave?.path === p)
-  if (open) return open.win.focus()
   const adopted = dirname(p) === resolve(autosaveDir())
   openEntry({ autosavePath: adopted ? p : null, filePath: adopted ? null : p })
 }
 
 // Once a file holds the text, its autosave is redundant: drop it so a later relaunch reads
 // the file (which may have changed on disk) rather than a stale copy.
+// Detached before the delete, so an edit arriving meanwhile starts a fresh autosave.
 async function dropAutosave(w: W): Promise<void> {
-  await w.autosave?.discard()
+  const old = w.autosave
   w.autosave = null
   saveSession()
+  await old?.discard()
 }
 
 // Both resolve to whether the document is now on disk; failures are shown, never silent.
@@ -247,6 +267,8 @@ app.on('open-file', (e, p) => {
 })
 
 export const newWindow = (): void => openEntry({ autosavePath: null, filePath: null })
+
+export const openPaths = (paths: string[]): void => paths.forEach(openPath)
 
 export function openInitial(paths: string[]): void {
   void guarded('Cannot restore the previous session', () =>

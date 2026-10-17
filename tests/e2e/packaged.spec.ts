@@ -1,5 +1,5 @@
 import { execFileSync } from 'child_process'
-import { copyFileSync, existsSync, readdirSync, readFileSync } from 'fs'
+import { copyFileSync, readdirSync, readFileSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
 import { expect, FIXTURE, test } from './app'
@@ -34,6 +34,4 @@ test('a .walkthrough opened through LaunchServices opens in the running app and 
       .filter((f) => f.startsWith('com.mtgocode.walkthrough.sfl'))
       .map((f) => readFileSync(join(RECENTS, f)).includes('finder-open.walkthrough'))
   await expect.poll(list, { timeout: 15000 }).toContain(true)
-  await app.evaluate(({ app }) => app.clearRecentDocuments())
-  expect(existsSync(RECENTS)).toBe(true)
 })

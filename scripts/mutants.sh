@@ -1,5 +1,6 @@
 #!/bin/bash
-# Mutation check: each mutant must turn the unit suite red. Usage: scripts/mutants.sh
+# Mutation check: each mutant must turn its suite red (unit for src/shared, else a rebuild
+# + e2e). Usage: scripts/mutants.sh
 cd "$(dirname "$0")/.." || exit 1
 fail=0
 bak=$(mktemp)
@@ -60,5 +61,7 @@ mutate $M/windows.ts 's/auto \?\?(\s*)saved \?\?/saved ??$1auto ??/' 'file prefe
 mutate $M/windows.ts 's/saveSession\(\)(\s*)quitting = true/quitting = true/' 'session not written at quit'
 mutate $M/windows.ts 's/(w\.file\.saved = w\.json\s*present\(w\))\s*await dropAutosave\(w\)/$1/' 'save keeps the stale autosave'
 mutate $M/windows.ts 's/if \(!ok\) return false/if (!ok) return true/' 'failed save reported as saved'
+mutate $M/windows.ts 's/if \(!w\.live \|\| /if (/' 'flush waits for a page that is not listening'
+mutate $R/Cell.tsx 's/!root\.current!\.contains\(document\.activeElement\)/false/' 'focus does not follow the focused cell'
 npx electron-vite build >/dev/null # never leave a mutant's build in out/
 exit $fail

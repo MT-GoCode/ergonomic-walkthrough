@@ -42,13 +42,17 @@ type Props = { cell: Cell; focused: boolean; editing: boolean; canIn: boolean; c
 export const CellView = memo(function CellView({ cell, focused, editing, canIn, canOut }: Props) {
   const id = cell.id
   const title = useRef<HTMLInputElement>(null)
-  // A cell mounts focused when it was just created or just moved by Tab/Shift+Tab.
+  const root = useRef<HTMLDivElement>(null)
+  // Keyboard focus follows the focused cell when it becomes focused from outside it: a new
+  // cell, one remounted by Tab/Shift+Tab, or the neighbour of a deleted cell.
   useEffect(() => {
-    if (focused && !editing) title.current!.focus()
+    if (focused && !editing && !root.current!.contains(document.activeElement))
+      title.current!.focus()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [focused])
   return (
     <div
+      ref={root}
       className={`cell ${cell.kind}${focused ? ' focused' : ''}`}
       data-id={id}
       onFocus={() => focused || dispatch({ a: 'focus', id })}
