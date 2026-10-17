@@ -8,7 +8,7 @@ import type { Cell } from '../../shared/doc'
 import { mdTheme, setup } from './editor'
 import { cellOf, focusTitle } from './focus'
 import { crossCellArrows } from './nav'
-import { useDispatch } from './state'
+import { dispatch } from './state'
 
 export function MdBody({
   cell,
@@ -17,9 +17,8 @@ export function MdBody({
   cell: Extract<Cell, { kind: 'md' }>
   editing: boolean
 }) {
-  const dispatch = useDispatch()
   const id = cell.id
-  const onChange = useCallback((text: string) => dispatch({ a: 'body', id, text }), [dispatch, id])
+  const onChange = useCallback((text: string) => dispatch({ a: 'body', id, text }), [id])
   const extensions = useMemo(
     () => [
       EditorView.lineWrapping,

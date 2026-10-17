@@ -1,14 +1,18 @@
-import { useRef, type ReactNode } from 'react'
+import { useMemo, useRef, type ReactNode } from 'react'
 import { insertModes, subtreeEnd } from '../../shared/ops'
 import { useAnchor } from './anchor'
 import { CellView, LangList } from './Cell'
-import { useDispatch, type State } from './state'
+import type { Settings } from '../../shared/settings'
+import { dispatch, type State } from './state'
 
-export function Canvas({ cells, focusId, editingId }: Omit<State, 'rev'>) {
-  const dispatch = useDispatch()
+type Props = Pick<State, 'cells' | 'focusId' | 'editingId'> & { settings: Settings }
+
+export function Canvas({ cells, focusId, editingId, settings }: Props) {
   const scroller = useRef<HTMLDivElement>(null)
   const track = useRef<HTMLDivElement>(null)
-  const offset = useAnchor(scroller, track, cells)
+  // Anything that changes cell geometry re-anchors: content, settings, raw/rendered markdown.
+  const layout = useMemo(() => [cells, settings, editingId], [cells, settings, editingId])
+  const offset = useAnchor(scroller, track, layout)
   // Flat list → nested groups: each cell is followed by its subtree in a guide column.
   const range = (from: number, to: number): ReactNode[] => {
     const out: ReactNode[] = []

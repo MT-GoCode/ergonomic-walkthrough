@@ -30,6 +30,8 @@ export default defineConfig(
   },
   // Inferred return types are the house style; explicit ones only add lines.
   { rules: { '@typescript-eslint/explicit-function-return-type': 'off' } },
+  // `electron -r` preloads must be CommonJS.
+  { files: ['**/*.cjs'], rules: { '@typescript-eslint/no-require-imports': 'off' } },
   // Playwright fixtures require `{}` destructuring and a `use` callback that is not a React hook.
   {
     files: ['tests/**'],

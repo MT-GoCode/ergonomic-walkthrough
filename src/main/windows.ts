@@ -7,12 +7,13 @@ import {
   type MenuItemConstructorOptions,
   type Rectangle
 } from 'electron'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync } from 'fs'
 import { basename, dirname, join, resolve } from 'path'
-import { newDoc, parseDoc, serializeDoc } from '../shared/doc'
-import { CH } from '../shared/ipc'
-import { DEFAULT_SETTINGS } from '../shared/settings'
+import { newCell, parseDoc, serializeDoc } from '../shared/doc'
+import { CH, type Command } from '../shared/ipc'
+import { atomicWrite } from './atomic'
 import { Autosave, autosaveDir } from './autosave'
+import { current } from './settings'
 import { readSession, writeSession, type Entry } from './session'
 
 // Main is the single owner of window state. `file.saved` is the text on disk, or null when
@@ -35,7 +36,9 @@ const filters = [{ name: 'Walkthrough', extensions: ['walkthrough'] }]
 const dirty = (w: W): boolean => w.file !== null && w.json !== w.file.saved
 const read = (p: string | null): string | null =>
   p && existsSync(p) ? readFileSync(p, 'utf8') : null
-const ofWin = (win: { id: number }): W => wins.get(win.id)!
+// Undefined for windows that are not documents (DevTools) or are already gone.
+const ofWin = (win: { id: number } | null | undefined): W | undefined =>
+  win ? wins.get(win.id) : undefined
 const entry = (w: W): Entry => ({
   autosavePath: w.autosave?.path ?? null,
   filePath: w.file?.path ?? null,
@@ -49,17 +52,41 @@ function present(w: W): void {
   w.win.setDocumentEdited(dirty(w))
 }
 
-function guarded(label: string, fn: () => void): void {
+// Returns whether fn succeeded; a failure is always shown, never swallowed.
+async function guarded(label: string, fn: () => unknown): Promise<boolean> {
   try {
-    fn()
+    await fn()
+    return true
   } catch (err) {
     dialog.showErrorBox(label, (err as Error).message)
+    return false
   }
 }
 
-ipcMain.handle(CH.init, (e) => JSON.parse(ofWin(BrowserWindow.fromWebContents(e.sender)!).json))
+// The renderer pushes each edit as it is applied and answers a flush after them (IPC is
+// FIFO), so once this resolves `w.json` holds every edit the user has made.
+const flushes = new Map<number, { wc: number; done: () => void }>()
+let flushSeq = 0
+function flush(w: W): Promise<void> {
+  const wc = w.win.webContents
+  if (wc.isDestroyed() || wc.isCrashed()) return Promise.resolve()
+  return new Promise((done) => {
+    const n = ++flushSeq
+    flushes.set(n, { wc: wc.id, done })
+    wc.send(CH.command, { t: 'flush', n } satisfies Command)
+  })
+}
+ipcMain.on(CH.flushed, (_e, n: number) => {
+  flushes.get(n)!.done()
+  flushes.delete(n)
+})
+
+ipcMain.handle(CH.init, (e) => ({
+  doc: JSON.parse(ofWin(BrowserWindow.fromWebContents(e.sender))!.json),
+  settings: current()
+}))
 ipcMain.on(CH.docChanged, (e, json: string) => {
-  const w = ofWin(BrowserWindow.fromWebContents(e.sender)!)
+  const w = ofWin(BrowserWindow.fromWebContents(e.sender))!
   w.json = json
   if (!w.autosave) {
     w.autosave = Autosave.create(w.uuid)
@@ -91,24 +118,32 @@ function createWindow(state: Omit<W, 'win' | 'uuid'>, bounds?: Rectangle): void 
   present(w)
   if (w.file) app.addRecentDocument(w.file.path)
   win.on('page-title-updated', (e) => e.preventDefault())
+  win.webContents.on('render-process-gone', () =>
+    flushes.forEach((f, n) => f.wc === win.webContents.id && (f.done(), flushes.delete(n)))
+  )
   win.on('close', (e) => {
     if (quitting) return
-    if (dirty(w)) {
-      const choice = dialog.showMessageBoxSync(win, {
-        type: 'warning',
-        message: `Save changes to ${basename(w.file!.path)}?`,
-        buttons: ['Save', "Don't Save", 'Cancel'],
-        defaultId: 0,
-        cancelId: 2
-      })
-      if (choice === 2) return e.preventDefault()
-      if (choice === 0) save(w)
-      else w.autosave = null
-    }
-    const p = w.file?.path ?? w.autosave?.path
-    if (!p) return
-    app.addRecentDocument(p)
-    closed.push(entry(w))
+    e.preventDefault()
+    void flush(w).then(async () => {
+      if (dirty(w)) {
+        const choice = dialog.showMessageBoxSync(win, {
+          type: 'warning',
+          message: `Save changes to ${basename(w.file!.path)}?`,
+          buttons: ['Save', "Don't Save", 'Cancel'],
+          defaultId: 0,
+          cancelId: 2
+        })
+        if (choice === 2) return
+        if (choice === 0 && !(await save(w))) return
+        if (choice === 1) await dropAutosave(w)
+      }
+      const p = w.file?.path ?? w.autosave?.path
+      if (p) {
+        app.addRecentDocument(p)
+        closed.push(entry(w))
+      }
+      win.destroy()
+    })
   })
   win.on('closed', () => {
     wins.delete(win.id)
@@ -123,20 +158,22 @@ function createWindow(state: Omit<W, 'win' | 'uuid'>, bounds?: Rectangle): void 
 
 // Content is the autosave when one exists, otherwise the file; dirty is their difference.
 function openEntry({ autosavePath, filePath }: Paths, bounds?: Rectangle): void {
-  guarded(`Cannot open ${filePath ?? autosavePath ?? 'window'}`, () => {
+  void guarded(`Cannot open ${filePath ?? autosavePath ?? 'window'}`, () => {
     const auto = read(autosavePath)
     const saved = read(filePath)
     const json =
       auto ??
       saved ??
-      ((autosavePath ?? filePath) ? null : serializeDoc(newDoc(DEFAULT_SETTINGS.defaultLang).cells))
+      ((autosavePath ?? filePath)
+        ? null
+        : serializeDoc([newCell('code', 0, current().defaultLang)]))
     if (json === null)
       throw new Error(`Neither the file nor its autosave exists: ${filePath ?? autosavePath}`)
     parseDoc(json)
     createWindow(
       {
         json,
-        autosave: auto === null ? null : new Autosave(autosavePath!),
+        autosave: auto === null ? null : Autosave.at(autosavePath!),
         file: filePath ? { path: filePath, saved } : null
       },
       bounds
@@ -152,35 +189,54 @@ function openPath(path: string): void {
   openEntry({ autosavePath: adopted ? p : null, filePath: adopted ? null : p })
 }
 
-function save(w: W): void {
-  if (!w.file) return void saveAs(w)
-  writeFileSync(w.file.path, w.json)
-  w.file.saved = w.json
-  present(w)
+// Once a file holds the text, its autosave is redundant: drop it so a later relaunch reads
+// the file (which may have changed on disk) rather than a stale copy.
+async function dropAutosave(w: W): Promise<void> {
+  await w.autosave?.discard()
+  w.autosave = null
+  saveSession()
 }
 
-async function saveAs(w: W): Promise<void> {
+// Both resolve to whether the document is now on disk; failures are shown, never silent.
+async function save(w: W): Promise<boolean> {
+  if (!w.file) return saveAs(w)
+  const path = w.file.path
+  await flush(w)
+  const ok = await guarded(`Cannot save ${path}`, () => atomicWrite(path, w.json))
+  if (!ok) return false
+  w.file.saved = w.json
+  present(w)
+  await dropAutosave(w)
+  return true
+}
+
+async function saveAs(w: W): Promise<boolean> {
   const r = await dialog.showSaveDialog(w.win, {
     defaultPath: w.file?.path ?? 'Untitled.walkthrough',
     filters
   })
-  if (r.canceled) return
-  writeFileSync(r.filePath, w.json)
+  if (r.canceled) return false
+  await flush(w)
+  if (!(await guarded(`Cannot save ${r.filePath}`, () => atomicWrite(r.filePath, w.json))))
+    return false
   w.file = { path: r.filePath, saved: w.json }
   present(w)
   app.addRecentDocument(r.filePath)
-  saveSession()
+  await dropAutosave(w)
+  return true
 }
 
 // Hot exit: quitting never prompts; it waits for in-flight autosaves, then records the session.
 app.on('before-quit', (e) => {
   if (quitting) return
   e.preventDefault()
-  Promise.all([...wins.values()].map((w) => w.autosave?.flush())).then(() => {
-    saveSession()
-    quitting = true
-    app.quit()
-  })
+  void Promise.all([...wins.values()].map((w) => flush(w).then(() => w.autosave?.flush()))).then(
+    () => {
+      saveSession()
+      quitting = true
+      app.quit()
+    }
+  )
 })
 
 // Registered at import, before ready, so a Finder launch's file is not lost.
@@ -190,16 +246,21 @@ app.on('open-file', (e, p) => {
   else early.push(p)
 })
 
+export const newWindow = (): void => openEntry({ autosavePath: null, filePath: null })
+
 export function openInitial(paths: string[]): void {
-  guarded('Cannot restore the previous session', () =>
+  void guarded('Cannot restore the previous session', () =>
     readSession().forEach((s) => openEntry(s, s.bounds))
   )
   ;[...paths, ...early.splice(0)].forEach(openPath)
-  if (!wins.size) openEntry({ autosavePath: null, filePath: null })
+  if (!wins.size) newWindow()
 }
 
-const onWin = (fn: (w: W) => unknown) => (_: unknown, win: { id: number } | undefined) =>
-  win && fn(ofWin(win))
+// Menu items act on the window they were invoked from, and only if it is a document.
+const onWin = (fn: (w: W) => unknown) => (_: unknown, win: { id: number } | undefined) => {
+  const w = ofWin(win)
+  if (w) void fn(w)
+}
 
 export const fileMenu = (): MenuItemConstructorOptions[] => [
   {
@@ -209,7 +270,7 @@ export const fileMenu = (): MenuItemConstructorOptions[] => [
         id: 'newWindow',
         label: 'New Window',
         accelerator: 'CmdOrCtrl+N',
-        click: () => openEntry({ autosavePath: null, filePath: null })
+        click: newWindow
       },
       {
         id: 'open',

@@ -130,11 +130,13 @@ body {
   cursor: pointer;
 }
 .strip {
+  /* A quarter-line hover band just inside the cell's bottom edge; the buttons it reveals
+     hang below the border, over the next title bar, never over this cell's text. */
   position: absolute;
   left: 0;
   right: calc(-10px - var(--lh));
-  bottom: calc(var(--lh) / -4);
-  height: calc(var(--lh) / 2);
+  bottom: 0;
+  height: calc(var(--lh) / 4);
   z-index: 2;
 }
 .strip .btns {
@@ -142,8 +144,7 @@ body {
   position: absolute;
   left: 0;
   width: calc(var(--cols) * 1ch + 10px);
-  top: 50%;
-  transform: translateY(-50%);
+  top: 100%;
   justify-content: center;
   gap: 1ch;
 }
@@ -170,7 +171,7 @@ body {
   display: none;
   position: absolute;
   right: 0;
-  top: 50%;
+  top: 100%;
   transform: translateY(-50%);
   width: var(--lh);
   height: var(--lh);
@@ -183,4 +184,44 @@ body {
 }
 .strip:hover .handle {
   display: block;
+}
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 0.5);
+  z-index: 10;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 10vh;
+}
+.settings {
+  background: #252526;
+  border: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: auto 30ch;
+  gap: 4px 2ch;
+  padding: 1ch 2ch 2ch;
+}
+.settings-title {
+  grid-column: 1 / -1;
+  color: #fff;
+  font-weight: bold;
+}
+.settings label {
+  display: contents;
+}
+.settings input {
+  font: inherit;
+  color: #cccccc;
+  background: #000;
+  border: 1px solid var(--border);
+  padding: 0 1ch;
+  outline: none;
+}
+.settings input:focus {
+  border-color: #0078d4;
+}
+.settings input.invalid {
+  border-color: #f14c4c;
 }

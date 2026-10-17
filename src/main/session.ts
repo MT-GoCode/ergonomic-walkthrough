@@ -1,7 +1,8 @@
 import { app } from 'electron'
-import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { z } from 'zod'
+import { atomicWrite } from './atomic'
 
 const Entry = z.strictObject({
   autosavePath: z.string().nullable(),
@@ -15,7 +16,4 @@ const file = (): string => join(app.getPath('userData'), 'session.json')
 export const readSession = (): Entry[] =>
   existsSync(file()) ? z.array(Entry).parse(JSON.parse(readFileSync(file(), 'utf8'))) : []
 
-export function writeSession(entries: Entry[]): void {
-  writeFileSync(`${file()}.tmp`, JSON.stringify(entries))
-  renameSync(`${file()}.tmp`, file())
-}
+export const writeSession = (entries: Entry[]): void => atomicWrite(file(), JSON.stringify(entries))

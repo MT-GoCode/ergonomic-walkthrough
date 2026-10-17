@@ -5,16 +5,15 @@ import type { Cell } from '../../shared/doc'
 import { dedent } from '../../shared/ops'
 import { codeTheme, setup, useLanguage } from './editor'
 import { crossCellArrows } from './nav'
-import { useDispatch } from './state'
+import { dispatch } from './state'
 
 const pasteDedented = EditorView.clipboardInputFilter.of(dedent)
 
 export function CodeBody({ cell }: { cell: Extract<Cell, { kind: 'code' }> }) {
-  const dispatch = useDispatch()
   const support = useLanguage(languages.find((l) => l.name === cell.lang)!)
   const onChange = useCallback(
     (text: string) => dispatch({ a: 'body', id: cell.id, text }),
-    [dispatch, cell.id]
+    [cell.id]
   )
   const extensions = useMemo(
     () => [EditorView.lineWrapping, crossCellArrows, pasteDedented, ...(support ? [support] : [])],

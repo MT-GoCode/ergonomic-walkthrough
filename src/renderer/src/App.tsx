@@ -1,39 +1,52 @@
-import { useEffect, useReducer } from 'react'
-import { serializeDoc } from '../../shared/doc'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { Command } from '../../shared/ipc'
-import { DEFAULT_SETTINGS as S } from '../../shared/settings'
+import type { Settings } from '../../shared/settings'
 import { Canvas } from './Canvas'
-import { DispatchCtx, reducer } from './state'
+import { SettingsModal } from './Settings'
+import { dispatch, store } from './state'
 
-export function App(): React.JSX.Element {
-  const [s, dispatch] = useReducer(reducer, { cells: [], focusId: null, editingId: null, rev: 0 })
+export function App() {
+  const s = useSyncExternalStore(store.subscribe, store.get)
+  // The last settings main broadcast; main is their only writer.
+  const [settings, setSettings] = useState<Settings | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   useEffect(() => {
-    const root = document.documentElement.style
-    root.setProperty('--font', S.fontFamily)
-    root.setProperty('--fs', `${S.fontSize}px`)
-    root.setProperty('--cols', String(S.cols))
-    window.api.init().then((doc) => dispatch({ a: 'init', cells: doc.cells }))
+    window.api.init().then(({ doc, settings }) => {
+      setSettings(settings)
+      dispatch({ a: 'init', cells: doc.cells, defaultLang: settings.defaultLang })
+    })
     window.api.onCommand((c: Command) => {
       switch (c.t) {
         case 'cellMenu':
           return dispatch({ a: c.op, id: c.id })
+        case 'settings':
+          setSettings(c.s)
+          return dispatch({ a: 'settings', defaultLang: c.s.defaultLang })
+        case 'openSettings':
+          return setSettingsOpen(true)
+        case 'flush':
+          // Every applied edit was pushed when it was dispatched; this reply follows them.
+          return window.api.flushed(c.n)
         default:
-          return c.t satisfies never
+          return c satisfies never
       }
     })
   }, [])
 
-  // rev counts user edits only, so loading a doc never pushes. At most one push per frame.
   useEffect(() => {
-    if (!s.rev) return
-    const frame = requestAnimationFrame(() => window.api.docChanged(serializeDoc(s.cells)))
-    return () => cancelAnimationFrame(frame)
-  }, [s.rev, s.cells])
+    if (!settings) return
+    const root = document.documentElement.style
+    root.setProperty('--font', settings.fontFamily)
+    root.setProperty('--fs', `${settings.fontSize}px`)
+    root.setProperty('--cols', String(settings.cols))
+  }, [settings])
 
+  if (!settings) return null
   return (
-    <DispatchCtx.Provider value={dispatch}>
-      <Canvas cells={s.cells} focusId={s.focusId} editingId={s.editingId} />
-    </DispatchCtx.Provider>
+    <>
+      <Canvas cells={s.cells} focusId={s.focusId} editingId={s.editingId} settings={settings} />
+      {settingsOpen && <SettingsModal settings={settings} close={() => setSettingsOpen(false)} />}
+    </>
   )
 }

@@ -1,7 +1,5 @@
 import { z } from 'zod'
-import { languages } from '@codemirror/language-data'
-
-const LANG_NAMES = languages.map((l) => l.name) as [string, ...string[]]
+import { LANG_NAMES } from './settings'
 
 const base = {
   id: z.string().min(1),
@@ -57,9 +55,3 @@ export function newCell(kind: Kind, depth: number, lang: string): Cell {
   const common = { id: crypto.randomUUID(), depth, title: '', body: '', collapsed: false }
   return kind === 'code' ? { ...common, kind, lang } : { ...common, kind, height: 'fit' }
 }
-
-export const newDoc = (lang: string): Doc => ({
-  format: 'walkthrough',
-  version: 1,
-  cells: [newCell('code', 0, lang)]
-})

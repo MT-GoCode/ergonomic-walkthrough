@@ -1,14 +1,11 @@
 import { memo, useEffect, useRef, useState, type PointerEvent } from 'react'
-import { languages } from '@codemirror/language-data'
 import type { Cell, Kind } from '../../shared/doc'
 import type { Mode } from '../../shared/ops'
 import { CodeBody } from './CodeBody'
 import { titleKey } from './focus'
+import { LANGS, langNamed } from './langs'
 import { MdBody } from './MdBody'
-import { useDispatch } from './state'
-
-const LANGS = languages.map((l) => l.name).sort((a, b) => a.localeCompare(b))
-const LANG_BY_LOWER = new Map(LANGS.map((n) => [n.toLowerCase(), n]))
+import { dispatch } from './state'
 
 // One datalist shared by every cell: per-cell option lists would put 143 × cells
 // nodes in the DOM, and style recalc over them dominates opening a large trace.
@@ -22,7 +19,6 @@ export const LangList = (): React.JSX.Element => (
 
 // Type to filter; only an exact language name is committed, anything else reverts on blur.
 function LangInput({ id, lang }: { id: string; lang: string }): React.JSX.Element {
-  const dispatch = useDispatch()
   const [draft, setDraft] = useState<string | null>(null)
   return (
     <input
@@ -32,7 +28,7 @@ function LangInput({ id, lang }: { id: string; lang: string }): React.JSX.Elemen
       value={draft ?? lang}
       onFocus={(e) => e.currentTarget.select()}
       onChange={(e) => {
-        const name = LANG_BY_LOWER.get(e.target.value.toLowerCase())
+        const name = langNamed(e.target.value)
         if (name) dispatch({ a: 'lang', id, text: name })
         setDraft(name ? null : e.target.value)
       }}
@@ -44,7 +40,6 @@ function LangInput({ id, lang }: { id: string; lang: string }): React.JSX.Elemen
 type Props = { cell: Cell; focused: boolean; editing: boolean; canIn: boolean; canOut: boolean }
 
 export const CellView = memo(function CellView({ cell, focused, editing, canIn, canOut }: Props) {
-  const dispatch = useDispatch()
   const id = cell.id
   const title = useRef<HTMLInputElement>(null)
   // A cell mounts focused when it was just created or just moved by Tab/Shift+Tab.
@@ -100,7 +95,6 @@ function InsertStrip({
   canOut: boolean
   resizable: boolean
 }) {
-  const dispatch = useDispatch()
   return (
     <div className="strip">
       <div className="btns">
@@ -122,18 +116,16 @@ function InsertStrip({
 
 // Drag snaps to whole lines, from 1 line up to what fits in the window under a title bar.
 function ResizeHandle({ id }: { id: string }) {
-  const dispatch = useDispatch()
   const drag = useRef<{ y: number; lines: number; lh: number; max: number } | null>(null)
   const down = (e: PointerEvent<HTMLDivElement>) => {
     const box = e.currentTarget.closest('.cell')!.querySelector<HTMLElement>('.mdbox')!
     const lh = parseFloat(getComputedStyle(box).lineHeight)
-    const titleH = box.closest('.cell')!.querySelector<HTMLElement>('.titlebar')!.offsetHeight
     e.currentTarget.setPointerCapture(e.pointerId)
     drag.current = {
       y: e.clientY,
       lines: box.clientHeight / lh,
       lh,
-      max: Math.floor((innerHeight - titleH) / lh)
+      max: Math.floor(parseFloat(getComputedStyle(box).maxHeight) / lh)
     }
   }
   const move = (e: PointerEvent<HTMLDivElement>) => {

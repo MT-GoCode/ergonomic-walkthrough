@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron'
 import { CH, type CellMenuOp, type Command } from '../shared/ipc'
-import { fileMenu, openInitial } from './windows'
+import { settingsItem } from './settings'
+import { fileMenu, newWindow, openInitial } from './windows'
 
 if (process.env.WT_USER_DATA) app.setPath('userData', process.env.WT_USER_DATA)
 
@@ -27,7 +28,22 @@ const cellMenu: [CellMenuOp, string][] = [
 app.whenReady().then(() => {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
-      { role: 'appMenu' },
+      {
+        label: app.name,
+        submenu: [
+          { role: 'about' },
+          { type: 'separator' },
+          settingsItem,
+          { type: 'separator' },
+          { role: 'services' },
+          { type: 'separator' },
+          { role: 'hide' },
+          { role: 'hideOthers' },
+          { role: 'unhide' },
+          { type: 'separator' },
+          { role: 'quit' }
+        ]
+      },
       ...fileMenu(),
       { role: 'editMenu' },
       { role: 'viewMenu' },
@@ -44,7 +60,7 @@ app.whenReady().then(() => {
     ).popup({ window: BrowserWindow.fromWebContents(e.sender)! })
   )
   openInitial(process.argv.filter((a) => a.endsWith('.walkthrough')))
-  app.on('activate', () => BrowserWindow.getAllWindows().length || openInitial([]))
+  app.on('activate', () => BrowserWindow.getAllWindows().length || newWindow())
 })
 
 // macOS: the app outlives its windows.

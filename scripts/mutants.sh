@@ -52,4 +52,13 @@ mutate $R/anchor.ts 's/setOffset\(Math\.min\(Math\.max\(left \+ width - sc\.clie
 mutate $R/anchor.ts 's/if \(pinned\.current \|\| frame\) return/if (frame) return/' 'focus pin ignored on scroll'
 mutate $R/theme.css 's/padding-bottom: 90vh;/padding-bottom: var(--lh);/' 'last cell cannot reach the anchor line'
 mutate $R/theme.css 's/\.clip \{\n  overflow: clip;/.clip {\n  overflow: visible;/' 'clip layer removed'
+M=src/main
+mutate $R/state.ts 's/if \(edited\) window\.api\.docChanged\(serializeDoc\(next\.cells\)\)/if (edited) requestAnimationFrame(() => window.api.docChanged(serializeDoc(next.cells)))/' 'edits pushed a frame late'
+mutate $M/windows.ts 's/w\.file !== null && w\.json !== w\.file\.saved/w.json !== w.file?.saved/' 'untitled windows count as dirty'
+mutate $M/windows.ts 's/w\.file\.saved = w\.json\n//' 'save does not record the saved text'
+mutate $M/windows.ts 's/auto \?\?(\s*)saved \?\?/saved ??$1auto ??/' 'file preferred over autosave'
+mutate $M/windows.ts 's/saveSession\(\)(\s*)quitting = true/quitting = true/' 'session not written at quit'
+mutate $M/windows.ts 's/(w\.file\.saved = w\.json\s*present\(w\))\s*await dropAutosave\(w\)/$1/' 'save keeps the stale autosave'
+mutate $M/windows.ts 's/if \(!ok\) return false/if (!ok) return true/' 'failed save reported as saved'
+npx electron-vite build >/dev/null # never leave a mutant's build in out/
 exit $fail

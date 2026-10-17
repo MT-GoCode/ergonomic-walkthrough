@@ -1,23 +1,19 @@
-import { copyFileSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'fs'
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync
+} from 'fs'
 import { join } from 'path'
 import type { ElectronApplication, Page } from '@playwright/test'
 import { parseDoc, serializeDoc } from '../../src/shared/doc'
-import { expect, FIXTURE, recordPushes, test } from './app'
+import { click, expect, FIXTURE, recordPushes, test, winId } from './app'
 
 // Main-process scratch for dialog/focus stubs; evaluate callbacks cannot close over test helpers.
 type G = { calls: unknown[]; answer: number }
-
-const winId = async (app: ElectronApplication, page: Page) =>
-  (await app.browserWindow(page)).evaluate((w) => w.id)
-
-const click = (app: ElectronApplication, item: string, id?: number) =>
-  app.evaluate(
-    ({ BrowserWindow, Menu }, [item, id]) =>
-      Menu.getApplicationMenu()!
-        .getMenuItemById(item)!
-        .click(undefined, id === undefined ? undefined : BrowserWindow.fromId(id)!),
-    [item, id] as const
-  )
 
 const loaded = async (page: Page) => {
   await page.waitForSelector('.cell .cm-content')
@@ -263,4 +259,99 @@ test('a file that fails validation shows an error box with the zod path and open
   expect(title).toContain(bad)
   expect(message).toMatch(/"cells",\s*0,\s*"depth"/)
   expect(await count(app)).toBe(1)
+})
+
+test('a save issued right after a keystroke always contains it, 20 times in a row (kills: save reads json without a renderer flush)', async ({
+  launch
+}, info) => {
+  const path = info.outputPath('race.walkthrough')
+  copyFileSync(FIXTURE, path)
+  const { app, page } = await launch([path])
+  const id = await winId(app, page)
+  await page.locator('.cell.code .cm-content').first().click()
+  for (let k = 0; k < 20; k++) {
+    await page.keyboard.type(`#${k}`)
+    await click(app, 'save', id)
+    await expect.poll(() => readFileSync(path, 'utf8')).toContain(`#${k}`)
+  }
+  expect((await windows(app)).map((w) => w.edited)).toEqual([false])
+})
+
+test('choosing Save in the close prompt writes the file and closes (kills: prompt choice 0 ignored)', async ({
+  launch
+}, info) => {
+  const path = info.outputPath('close-save.walkthrough')
+  copyFileSync(FIXTURE, path)
+  const { app, page } = await launch([path])
+  await typeIn(page, 'saved on close')
+  await stubDialog(app, 'showMessageBoxSync', 0)
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].close())
+  await expect.poll(() => count(app)).toBe(0)
+  expect(
+    parseDoc(readFileSync(path, 'utf8'))
+      .cells.map((c) => c.body)
+      .join('')
+  ).toContain('saved on close')
+})
+
+test('saving drops the autosave, so a relaunch reads the file even after it changed on disk (kills: stale autosave kept)', async ({
+  launch
+}, info) => {
+  const ud = info.outputPath('ud')
+  const path = info.outputPath('pulled.walkthrough')
+  copyFileSync(FIXTURE, path)
+  const { app, page } = await launch([path], ud)
+  await typeIn(page, 'local edit')
+  await expect.poll(() => autosaves(ud).length).toBe(1)
+  await click(app, 'save', await winId(app, page))
+  await expect.poll(() => autosaves(ud).length).toBe(0)
+  await quit(app)
+  const pulled = parseDoc(readFileSync(path, 'utf8'))
+  pulled.cells[0].title = 'changed by git pull'
+  writeFileSync(path, serializeDoc(pulled.cells))
+  const again = await launch([], ud)
+  await expect(again.page.locator('.title').first()).toHaveValue('changed by git pull')
+  expect((await windows(again.app)).map((w) => w.edited)).toEqual([false])
+})
+
+test('a Save As that cannot write shows an error and leaves the window untitled (kills: silent save failure)', async ({
+  launch
+}, info) => {
+  const { app, page } = await launch()
+  await typeIn(page, 'x')
+  await stubDialog(app, 'showErrorBox')
+  await app.evaluate(({ dialog }, p) => {
+    dialog.showSaveDialog = (async () => ({ canceled: false, filePath: p })) as never
+  }, info.outputPath('no/such/dir/out.walkthrough'))
+  await click(app, 'saveAs', await winId(app, page))
+  await expect.poll(async () => (await calls(app)).length).toBe(1)
+  expect((await calls(app))[0][0]).toContain('Cannot save')
+  expect((await windows(app)).map((w) => w.title)).toEqual(['Untitled'])
+})
+
+test('if Save in the close prompt fails, the error shows and the window stays open (kills: failed save reported as saved)', async ({
+  launch
+}, info) => {
+  const dir = info.outputPath('locked')
+  mkdirSync(dir)
+  const path = join(dir, 'locked.walkthrough')
+  copyFileSync(FIXTURE, path)
+  const { app, page } = await launch([path])
+  await typeIn(page, 'unsaveable')
+  chmodSync(dir, 0o555)
+  try {
+    await app.evaluate(({ dialog }) => {
+      const g = globalThis as unknown as { errors: string[] }
+      g.errors = []
+      dialog.showMessageBoxSync = (() => 0) as never
+      dialog.showErrorBox = ((title: string) => g.errors.push(title)) as never
+    })
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].close())
+    await expect
+      .poll(() => app.evaluate(() => (globalThis as unknown as { errors: string[] }).errors))
+      .toEqual([`Cannot save ${path}`])
+    expect(await count(app)).toBe(1)
+  } finally {
+    chmodSync(dir, 0o755)
+  }
 })
