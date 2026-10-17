@@ -3,11 +3,13 @@ import { newCell, type Cell, type Kind } from '../../shared/doc'
 import * as ops from '../../shared/ops'
 import { DEFAULT_SETTINGS } from '../../shared/settings'
 
-export type State = { cells: Cell[]; focusId: string | null; rev: number }
+// editingId: the one markdown cell showing raw text.
+export type State = { cells: Cell[]; focusId: string | null; editingId: string | null; rev: number }
 
 export type Action =
   | { a: 'init'; cells: Cell[] }
   | { a: 'focus'; id: string }
+  | { a: 'edit'; id: string | null }
   | { a: 'insert'; id: string; mode: ops.Mode; kind: Kind }
   | { a: 'remove' | 'removeIndented' | 'indent' | 'outdent' | 'toggle'; id: string }
   | { a: 'title' | 'body' | 'lang'; id: string; text: string }
@@ -18,10 +20,12 @@ const blank = (): Cell => newCell('code', 0, DEFAULT_SETTINGS.defaultLang)
 // Returns the next cells and the next focused id.
 function edit(
   cells: Cell[],
-  act: Exclude<Action, { a: 'init' | 'focus' }>,
+  act: Exclude<Action, { a: 'init' | 'focus' | 'edit' }>,
   focusId: string | null
 ): [Cell[], string | null] {
   const i = cells.findIndex((c) => c.id === act.id)
+  // A command from main can name a cell that was deleted before it arrived.
+  if (i < 0) return [cells, focusId]
   switch (act.a) {
     case 'insert': {
       const slot = ops.insertModes(cells, i)[act.mode]
@@ -51,10 +55,14 @@ function edit(
 }
 
 export function reducer(s: State, act: Action): State {
-  if (act.a === 'init') return { cells: act.cells, focusId: null, rev: 0 }
+  if (act.a === 'init') return { cells: act.cells, focusId: null, editingId: null, rev: 0 }
   if (act.a === 'focus') return { ...s, focusId: act.id }
+  if (act.a === 'edit') return { ...s, editingId: act.id }
   const [cells, focusId] = edit(s.cells, act, s.focusId)
-  return cells === s.cells ? s : { cells, focusId, rev: s.rev + 1 }
+  if (cells === s.cells) return s
+  // A new markdown cell opens raw, ready for typing.
+  const fresh = act.a === 'insert' && act.kind === 'md' ? focusId : s.editingId
+  return { cells, focusId, editingId: fresh, rev: s.rev + 1 }
 }
 
 export const DispatchCtx = createContext<Dispatch<Action> | null>(null)

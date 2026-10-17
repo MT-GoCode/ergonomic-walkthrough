@@ -6,7 +6,7 @@ import { Canvas } from './Canvas'
 import { DispatchCtx, reducer } from './state'
 
 export function App(): React.JSX.Element {
-  const [s, dispatch] = useReducer(reducer, { cells: [], focusId: null, rev: 0 })
+  const [s, dispatch] = useReducer(reducer, { cells: [], focusId: null, editingId: null, rev: 0 })
 
   useEffect(() => {
     const root = document.documentElement.style
@@ -33,7 +33,7 @@ export function App(): React.JSX.Element {
 
   return (
     <DispatchCtx.Provider value={dispatch}>
-      <Canvas cells={s.cells} focusId={s.focusId} />
+      <Canvas cells={s.cells} focusId={s.focusId} editingId={s.editingId} />
     </DispatchCtx.Provider>
   )
 }

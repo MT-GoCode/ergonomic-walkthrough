@@ -5,12 +5,18 @@ fail=0
 bak=$(mktemp)
 file=
 trap '[ -n "$file" ] && cp "$bak" "$file"' EXIT INT TERM
+suite() { # unit mutants need only the unit project; renderer mutants need a rebuild + e2e
+  case $1 in
+    src/shared/*) npx playwright test --project=unit -x --reporter=dot ;;
+    *) npx electron-vite build && npx playwright test --project=e2e -x --reporter=dot ;;
+  esac
+}
 mutate() { # file, perl substitution, description
   file=$1
   cp "$1" "$bak"
   perl -0pi -e "$2" "$1"
   if cmp -s "$1" "$bak"; then echo "NOT APPLIED: $3"; fail=1
-  elif npx playwright test --project=unit -x --reporter=dot >/dev/null 2>&1; then echo "SURVIVED: $3"; fail=1
+  elif suite "$1" >/dev/null 2>&1; then echo "SURVIVED: $3"; fail=1
   else echo "killed: $3"; fi
   cp "$bak" "$1"
   file=
@@ -34,4 +40,16 @@ mutate $O 's/draft\[i\]\.collapsed = false \/\/ adopted siblings must not vanish
 mutate $D 's/cells: z\.array\(Cell\)\.min\(1\)/cells: z.array(Cell)/' 'empty doc accepted'
 mutate $D 's/const max = i === 0 \? 0 : cells\[i - 1\]\.depth \+ 1/const max = i === 0 ? 0 : cells[i - 1].depth + 2/' 'depth jump accepted'
 mutate $D 's/ids\.has\(c\.id\)/false/' 'duplicate ids accepted'
+R=src/renderer/src
+mutate $R/nav.ts 's/cursorLineUp\(v\) \|\| bodyEdge\(v, -1\)/cursorLineUp(v)/' 'up arrow stops at the body top'
+mutate $R/focus.ts "s/a: e\.shiftKey \? 'outdent' : 'indent'/a: e.shiftKey ? 'indent' : 'outdent'/" 'Tab and Shift+Tab swapped'
+mutate $R/focus.ts 's/isMd\(cell\) \? next && focusTitle\(next\) : focusBody/focusBody/' 'down arrow opens markdown raw'
+mutate $R/Cell.tsx 's/if \(focused && !editing\) title\.current!\.focus\(\)/void 0/' 'new cell not focused'
+mutate $R/Cell.tsx 's/, d\.max\)/, Infinity)/' 'resize unclamped'
+mutate $R/CodeBody.tsx 's/crossCellArrows, pasteDedented,/crossCellArrows,/' 'paste not dedented'
+mutate $R/state.ts "s/act\.a === 'insert' && act\.kind === 'md' \? focusId : s\.editingId/s.editingId/" 'new markdown cell not raw'
+mutate $R/anchor.ts 's/setOffset\(Math\.min\(Math\.max\(left \+ width - sc\.clientWidth, 0\), left\)\)/setOffset(0)/' 'anchor never slides'
+mutate $R/anchor.ts 's/if \(pinned\.current \|\| frame\) return/if (frame) return/' 'focus pin ignored on scroll'
+mutate $R/theme.css 's/padding-bottom: 90vh;/padding-bottom: var(--lh);/' 'last cell cannot reach the anchor line'
+mutate $R/theme.css 's/\.clip \{\n  overflow: clip;/.clip {\n  overflow: visible;/' 'clip layer removed'
 exit $fail

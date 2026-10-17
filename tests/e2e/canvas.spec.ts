@@ -99,12 +99,13 @@ test('clicking a guide folds exactly its subtree and the placeholder counts it (
   await expect(page.locator('.cell')).toHaveCount(fixture.length)
 })
 
-test('markdown: single click stays rendered, double click edits raw, Esc renders (kills: click → edit)', async ({
+test('markdown: click focuses but stays rendered; double click or Enter edits raw; Esc renders (kills: click → edit)', async ({
   launch
 }) => {
   const { page } = await launch([FIXTURE])
   const md = page.locator('.cell.md').first()
   await md.locator('.rendered').click()
+  await expect(md).toHaveClass(/focused/)
   expect(await md.locator('.cm-editor').count()).toBe(0)
   await md.locator('.rendered').dblclick()
   await expect(md.locator('.cm-editor')).toBeVisible()
@@ -112,4 +113,7 @@ test('markdown: single click stays rendered, double click edits raw, Esc renders
   await page.keyboard.type(' **bold**')
   await page.keyboard.press('Escape')
   await expect(md.locator('.rendered strong')).toHaveText('bold')
+  await md.locator('.rendered').click()
+  await page.keyboard.press('Enter')
+  await expect(md.locator('.cm-editor')).toBeVisible()
 })

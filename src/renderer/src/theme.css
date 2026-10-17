@@ -11,7 +11,20 @@ body {
   background: #000;
   color: #cccccc;
   font: var(--fs) / var(--lh) var(--font);
+  overflow: hidden;
+}
+.scroller {
+  height: 100vh;
+  overflow-y: auto;
   overflow-x: hidden;
+}
+.clip {
+  overflow: clip;
+}
+.track {
+  transition: transform 125ms ease-out; /* VS Code's smooth-scroll duration */
+  /* VS Code's scrollBeyondLastLine: the last cell can reach the 10% anchor line. */
+  padding-bottom: 90vh;
 }
 .cell {
   /* cols characters of text + CodeMirror line padding (2 × 4px) + borders */
@@ -115,4 +128,59 @@ body {
   padding: 0 4px;
   color: #888;
   cursor: pointer;
+}
+.strip {
+  position: absolute;
+  left: 0;
+  right: calc(-10px - var(--lh));
+  bottom: calc(var(--lh) / -4);
+  height: calc(var(--lh) / 2);
+  z-index: 2;
+}
+.strip .btns {
+  display: none;
+  position: absolute;
+  left: 0;
+  width: calc(var(--cols) * 1ch + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  justify-content: center;
+  gap: 1ch;
+}
+.strip:hover .btns {
+  display: flex;
+}
+.strip button {
+  font: inherit;
+  color: #cccccc;
+  background: #1f1f1f;
+  border: 1px solid var(--border);
+  padding: 0 1ch;
+  cursor: pointer;
+}
+.strip button:hover:enabled {
+  border-color: #0078d4;
+  color: #fff;
+}
+.strip button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.handle {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--lh);
+  height: var(--lh);
+  border-radius: 50%;
+  background: #1f1f1f;
+  border: 1px solid var(--border);
+  text-align: center;
+  cursor: ns-resize;
+  user-select: none;
+}
+.strip:hover .handle {
+  display: block;
 }

@@ -1,11 +1,15 @@
 import { writeFileSync } from 'fs'
-import { serializeDoc, newCell } from '../../src/shared/doc'
+import { newCell, serializeDoc } from '../../src/shared/doc'
 import { expect, test } from './app'
 
-// 300 cells × 60 lines (18k lines). Budget = slowest of 5 isolated runs on mac-work-2
-// (1807 ms, launch included) + their spread (59 ms), measured 2026-10-16.
-const BUDGET_MS = 1807 + 59
-test('a 300-cell, 18k-line trace opens and paints every editor', async ({ launch }, info) => {
+// Opening 300 cells × 60 lines (18k lines) is gated on Chromium's work counters, which
+// are identical run to run and immune to machine load (wall and CPU time are not on
+// Apple Silicon). Measured 2026-10-16; any increase is a regression, a decrease a new floor.
+const BUDGET = { RecalcStyleCount: 1508, LayoutCount: 907, elements: 54334 }
+
+test('opening a 300-cell, 18k-line trace does no more style, layout or DOM work than measured', async ({
+  launch
+}, info) => {
   const line = '    model_outputs = self.preprocess(inputs, **preprocess_params)  # noted\n'
   const cells = Array.from({ length: 300 }, (_, i) => ({
     ...newCell('code', i % 2, 'Python'),
@@ -14,11 +18,28 @@ test('a 300-cell, 18k-line trace opens and paints every editor', async ({ launch
   }))
   const path = info.outputPath('big.walkthrough')
   writeFileSync(path, serializeDoc(cells))
-  const t0 = Date.now()
   const { page } = await launch([path])
   await expect(page.locator('.cm-content')).toHaveCount(300)
+  // Counters start at Performance.enable, so measure a full reload of the same document.
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send('Performance.enable')
+  const t0 = Date.now()
+  await page.reload()
+  await expect(page.locator('.cm-content')).toHaveCount(300)
+  await page.evaluate(
+    () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+  )
   const ms = Date.now() - t0
-  console.log(`PERF open-300x60 ${ms}ms`)
-  info.annotations.push({ type: 'perf', description: `open-300x60 ${ms}ms` })
-  expect(ms).toBeLessThanOrEqual(BUDGET_MS)
+  const m = Object.fromEntries(
+    (await cdp.send('Performance.getMetrics')).metrics.map((x) => [x.name, x.value])
+  )
+  const used = {
+    RecalcStyleCount: m.RecalcStyleCount,
+    LayoutCount: m.LayoutCount,
+    elements: await page.evaluate(() => document.getElementsByTagName('*').length)
+  }
+  info.annotations.push({ type: 'perf', description: `${JSON.stringify(used)} in ${ms}ms wall` })
+  expect(used.RecalcStyleCount).toBeLessThanOrEqual(BUDGET.RecalcStyleCount)
+  expect(used.LayoutCount).toBeLessThanOrEqual(BUDGET.LayoutCount)
+  expect(used.elements).toBeLessThanOrEqual(BUDGET.elements)
 })
