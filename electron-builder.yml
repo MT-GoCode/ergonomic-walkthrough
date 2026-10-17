@@ -1,0 +1,14 @@
+appId: com.mtgocode.walkthrough
+productName: Walkthrough
+# Main and preload bundle their dependencies, so the app needs nothing from node_modules.
+files:
+  - out/**
+mac:
+  target: dir
+  # Explicit ad-hoc signature (electron-builder 26: "-"); ad-hoc needs hardenedRuntime off.
+  identity: '-'
+  hardenedRuntime: false
+fileAssociations:
+  - ext: walkthrough
+    name: Walkthrough
+    role: Editor
