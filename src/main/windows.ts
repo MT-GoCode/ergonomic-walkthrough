@@ -130,10 +130,11 @@ function createWindow(state: Omit<W, 'win' | 'live'>, bounds?: Rectangle): void 
   present(w)
   if (w.file) app.addRecentDocument(w.file.path)
   win.on('page-title-updated', (e) => e.preventDefault())
-  win.webContents.on('did-start-loading', () => (w.live = false))
-  win.webContents.on('render-process-gone', () =>
+  // A page that reloads or dies holds no edits beyond what it pushed: release its flushes.
+  const abandon = () =>
     flushes.forEach((f, n) => f.wc === win.webContents.id && (f.done(), flushes.delete(n)))
-  )
+  win.webContents.on('did-start-loading', () => ((w.live = false), abandon()))
+  win.webContents.on('render-process-gone', abandon)
   win.on('close', (e) => {
     if (quitting) return
     e.preventDefault()

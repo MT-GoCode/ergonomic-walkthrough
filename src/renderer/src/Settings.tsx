@@ -31,7 +31,10 @@ export function SettingsModal({ settings, close }: { settings: Settings; close: 
   const bad = new Set(parsed.success ? [] : parsed.error.issues.map((i) => i.path[0]))
   // Committed on Enter, blur or close, not per keystroke: retyping 88 → 100 must not lay
   // every window out at width 1 on the way.
-  const commit = () => parsed.success && window.api.setSettings(parsed.data)
+  const commit = () =>
+    parsed.success &&
+    JSON.stringify(parsed.data) !== JSON.stringify(settings) &&
+    window.api.setSettings(parsed.data)
   const done = () => (commit(), close())
   return (
     <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && done()}>
