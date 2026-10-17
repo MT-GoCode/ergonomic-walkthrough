@@ -45,7 +45,6 @@ R=src/renderer/src
 mutate $R/nav.ts 's/cursorLineUp\(v\) \|\| bodyEdge\(v, -1\)/cursorLineUp(v)/' 'up arrow stops at the body top'
 mutate $R/focus.ts "s/a: e\.shiftKey \? 'outdent' : 'indent'/a: e.shiftKey ? 'indent' : 'outdent'/" 'Tab and Shift+Tab swapped'
 mutate $R/focus.ts 's/isMd\(cell\) \? next && focusTitle\(next\) : focusBody/focusBody/' 'down arrow opens markdown raw'
-mutate $R/Cell.tsx 's/if \(focused && !editing\) title\.current!\.focus\(\)/void 0/' 'new cell not focused'
 mutate $R/Cell.tsx 's/, d\.max\)/, Infinity)/' 'resize unclamped'
 mutate $R/CodeBody.tsx 's/crossCellArrows, pasteDedented,/crossCellArrows,/' 'paste not dedented'
 mutate $R/state.ts "s/act\.a === 'insert' && act\.kind === 'md' \? focusId : s\.editingId/s.editingId/" 'new markdown cell not raw'
