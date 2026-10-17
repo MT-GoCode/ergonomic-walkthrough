@@ -1,0 +1,29 @@
+name: test
+on: [push, workflow_dispatch]
+jobs:
+  test:
+    # Apple Silicon macOS: the only platform Walkthrough ships for.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck && npx eslint . && npx prettier --check .
+      - run: npm test
+      - run: npm run dist
+      - name: Register the packaged app with LaunchServices
+        run: /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f dist/mac-arm64/Walkthrough.app
+      - name: Whole e2e suite against the packaged app
+        run: npx playwright test --project=e2e
+        env:
+          WT_EXECUTABLE: ${{ github.workspace }}/dist/mac-arm64/Walkthrough.app/Contents/MacOS/Walkthrough
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright
+          path: |
+            playwright-report
+            test-results

@@ -82,10 +82,12 @@ test('an invalid value is marked and never sent (kills: unvalidated setSettings)
     .toBe('14px')
 })
 
+// `electron -r` (to stub the startup error box) exists only in the dev runner.
 test('a corrupt settings.json is reported and the defaults apply (kills: silent parse failure)', async ({
   launch
 }, info) => {
   const userData = info.outputPath('ud')
+  test.skip(!!process.env.WT_EXECUTABLE, 'error-box preload needs the dev runner')
   const { app } = await launch([], userData)
   await app.close()
   writeFileSync(`${userData}/settings.json`, '{"cols": "wide"}')

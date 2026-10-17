@@ -20,12 +20,17 @@ export const test = base.extend<{
     const exited = new Set<ElectronApplication>()
     await use(
       async (files = [], userData = info.outputPath(`userdata-${apps.length}`), opts = {}) => {
+        // WT_EXECUTABLE runs the whole suite against a packaged app instead of out/.
+        const packaged = process.env.WT_EXECUTABLE
         const app = await _electron.launch({
-          args: [
-            ...(opts.stubErrorBox ? ['-r', join(__dirname, 'stub-error-box.cjs')] : []),
-            join(ROOT, 'out/main/index.js'),
-            ...files
-          ],
+          executablePath: packaged,
+          args: packaged
+            ? files
+            : [
+                ...(opts.stubErrorBox ? ['-r', join(__dirname, 'stub-error-box.cjs')] : []),
+                join(ROOT, 'out/main/index.js'),
+                ...files
+              ],
           env: {
             ...process.env,
             WT_SHOW_INACTIVE: '1',

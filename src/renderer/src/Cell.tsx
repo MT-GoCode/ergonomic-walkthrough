@@ -58,6 +58,7 @@ export const CellView = memo(function CellView({ cell, focused, editing, canIn, 
           ref={title}
           className="title"
           spellCheck={false}
+          placeholder={cell.kind === 'code' ? 'file:line' : 'note'}
           value={cell.title}
           onChange={(e) => dispatch({ a: 'title', id, text: e.target.value })}
           onKeyDown={(e) => titleKey(e, dispatch)}
