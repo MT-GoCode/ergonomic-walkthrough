@@ -1,0 +1,118 @@
+/* VS Code Dark Modern palette, black code. Every box is flush and square. */
+:root {
+  --lh: calc(var(--fs) * 1.4); /* CodeMirror's default line height */
+  --indent: 3ch;
+  --title-h: calc(var(--lh) + 2px);
+  --border: #3c3c3c;
+}
+html,
+body {
+  margin: 0;
+  background: #000;
+  color: #cccccc;
+  font: var(--fs) / var(--lh) var(--font);
+  overflow-x: hidden;
+}
+.cell {
+  /* cols characters of text + CodeMirror line padding (2 × 4px) + borders */
+  width: calc(var(--cols) * 1ch + 8px + 2px);
+  border: 1px solid var(--border);
+  margin-top: -1px;
+  position: relative;
+  box-sizing: border-box;
+  background: #000;
+}
+.cell.focused {
+  border-color: #0078d4;
+  z-index: 1;
+}
+.titlebar {
+  display: flex;
+  height: var(--title-h);
+  background: #2d2d2d;
+  border-bottom: 1px solid var(--border);
+  box-sizing: border-box;
+}
+.titlebar input,
+.titlebar button {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+.title {
+  flex: 1;
+  min-width: 0;
+  padding: 0 4px;
+  color: #fff !important;
+  font-weight: bold !important;
+}
+.lang {
+  color: #cccccc;
+  field-sizing: content;
+  padding: 0 1ch;
+}
+.more {
+  width: 3ch;
+  cursor: pointer;
+}
+.md .body {
+  background: #1f1f1f;
+}
+.mdbox {
+  overflow: auto;
+  max-height: calc(100vh - var(--title-h) - 2px);
+}
+.rendered {
+  padding: 0 4px;
+  min-height: var(--lh);
+}
+.rendered :is(p, ul, ol, pre, blockquote, table, h1, h2, h3, h4, h5, h6) {
+  margin: 0;
+  font-size: inherit;
+}
+.rendered :is(h1, h2, h3, h4, h5, h6, strong) {
+  color: #fff;
+}
+.rendered :is(ul, ol) {
+  padding-left: 3ch;
+}
+.rendered code {
+  background: #000;
+}
+.rendered a {
+  color: #4daafc;
+}
+.group {
+  display: flex;
+}
+.guide {
+  flex: none;
+  width: var(--indent);
+  position: relative;
+  cursor: pointer;
+}
+.guide::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--border);
+}
+.guide:hover::before {
+  border-color: #cccccc;
+}
+.kids {
+  flex: none;
+}
+.folded {
+  width: calc(var(--cols) * 1ch + 8px + 2px);
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  margin-top: -1px;
+  padding: 0 4px;
+  color: #888;
+  cursor: pointer;
+}

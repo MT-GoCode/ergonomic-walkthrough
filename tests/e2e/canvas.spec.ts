@@ -1,0 +1,105 @@
+import { readFileSync } from 'fs'
+import { parseDoc } from '../../src/shared/doc'
+import { visible } from '../../src/shared/ops'
+import { chPx, expect, FIXTURE, recordPushes, test } from './app'
+
+const fixture = parseDoc(readFileSync(FIXTURE, 'utf8')).cells
+
+test('the HF trace renders every cell at its depth, 3 characters per level (kills: guide width ≠ 3ch)', async ({
+  launch
+}, info) => {
+  const { page } = await launch([FIXTURE])
+  const ch = await chPx(page)
+  const rows = await page.$$eval('.cell', (els) =>
+    els.map((e) => ({ title: (e.querySelector('.title') as HTMLInputElement).value, left: e.getBoundingClientRect().left }))
+  )
+  expect(rows.map((r) => r.title)).toEqual(fixture.map((c) => c.title))
+  const left0 = rows[0].left
+  rows.forEach((r, i) => expect(Math.abs(r.left - left0 - fixture[i].depth * 3 * ch), r.title).toBeLessThan(0.5))
+  await page.screenshot({ path: info.outputPath('hf-trace.png') })
+})
+
+test('exactly 88 characters fit on a line and the 89th wraps (kills: cell width ≠ cols·ch + padding)', async ({
+  launch
+}) => {
+  const { page } = await launch()
+  const editor = page.locator('.cell .cm-content').first()
+  await editor.click()
+  await page.keyboard.type('x'.repeat(88))
+  const lh = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('.cm-line')!).lineHeight))
+  const height = () => page.locator('.cm-line').first().evaluate((e) => e.getBoundingClientRect().height)
+  expect(await height()).toBeCloseTo(lh, 0)
+  await page.keyboard.type('x')
+  expect(await height()).toBeCloseTo(2 * lh, 0)
+})
+
+test('code editors are bare: no gutters, no completion popup, no lint, no spellcheck (kills: basicSetup defaults)', async ({
+  launch
+}) => {
+  const { page } = await launch()
+  await page.locator('.cm-content').first().click()
+  await page.keyboard.type('pri')
+  await page.waitForTimeout(500) // > CodeMirror's 100ms activateOnTypingDelay, so a popup would be open
+  expect(await page.locator('.cm-gutters').count()).toBe(0)
+  expect(await page.locator('.cm-tooltip-autocomplete').count()).toBe(0)
+  expect(await page.locator('.cm-lintRange').count()).toBe(0)
+  await expect(page.locator('.title').first()).toHaveAttribute('spellcheck', 'false')
+})
+
+test('typing pushes the edited doc to main, and opening one does not (kills: rev bumped on init)', async ({
+  launch
+}) => {
+  const { app, page } = await launch([FIXTURE])
+  const last = await recordPushes(app)
+  await page.waitForTimeout(300)
+  expect(await last()).toBeUndefined()
+  await page.locator('.cell.code .cm-content').first().click()
+  await page.keyboard.type('# traced')
+  await expect.poll(async () => parseDoc((await last())!).cells[1].body).toContain('# traced')
+})
+
+test('only an exact language name re-highlights; partial text reverts (kills: draft committed / extension not reconfigured)', async ({
+  launch
+}) => {
+  const { page } = await launch()
+  await page.locator('.cm-content').first().click()
+  await page.keyboard.type('def f(): return "s"')
+  const spans = () => page.locator('.cm-line span').evaluateAll((s) => s.map((e) => e.className).join(' '))
+  await expect.poll(spans).not.toBe('')
+  const python = await spans()
+  const lang = page.locator('input.lang').first()
+  await lang.fill('Mark')
+  await lang.blur()
+  await expect(lang).toHaveValue('Python')
+  expect(await spans()).toBe(python)
+  await lang.fill('Markdown')
+  await expect.poll(spans).not.toBe(python)
+})
+
+test('clicking a guide folds exactly its subtree and the placeholder counts it (kills: range bounds)', async ({
+  launch
+}) => {
+  const { page } = await launch([FIXTURE])
+  const parent = fixture.findIndex((c) => c.title.startsWith('__init__.py:441'))
+  const hidden = visible(fixture.map((c, i) => ({ ...c, collapsed: i === parent }))).length
+  await page.locator('.guide').first().click()
+  await expect(page.locator('.cell')).toHaveCount(hidden)
+  await expect(page.locator('.folded')).toHaveText(`▸ ${fixture.length - hidden} cells`)
+  await page.locator('.folded').click()
+  await expect(page.locator('.cell')).toHaveCount(fixture.length)
+})
+
+test('markdown: single click stays rendered, double click edits raw, Esc renders (kills: click → edit)', async ({
+  launch
+}) => {
+  const { page } = await launch([FIXTURE])
+  const md = page.locator('.cell.md').first()
+  await md.locator('.rendered').click()
+  expect(await md.locator('.cm-editor').count()).toBe(0)
+  await md.locator('.rendered').dblclick()
+  await expect(md.locator('.cm-editor')).toBeVisible()
+  await page.keyboard.press('End')
+  await page.keyboard.type(' **bold**')
+  await page.keyboard.press('Escape')
+  await expect(md.locator('.rendered strong')).toHaveText('bold')
+})

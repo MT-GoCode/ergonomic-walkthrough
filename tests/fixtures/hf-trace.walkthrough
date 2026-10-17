@@ -1,0 +1,186 @@
+{
+  "format": "walkthrough",
+  "version": 1,
+  "cells": [
+    {
+      "id": "cf0f9286-0952-4df8-8bca-138995f7a121",
+      "depth": 0,
+      "title": "goal",
+      "body": "Trace `pipeline('sentiment-analysis')(\"This movie is disgustingly good !\")` end to end.",
+      "collapsed": false,
+      "kind": "md",
+      "height": "fit"
+    },
+    {
+      "id": "444748bd-bc0d-4427-8a75-01e0756a1309",
+      "depth": 0,
+      "title": "__init__.py:441 pipeline()",
+      "body": "def pipeline(\n    task: str | None = None,\n    model: str | PreTrainedModel | None = None,\n    config: str | PreTrainedConfig | None = None,\n    tokenizer: str | PreTrainedTokenizer | PreTrainedTokenizerFast | None = None,\n    feature_extractor: str | PreTrainedFeatureExtractor | None = None,\n    image_processor: str | BaseImageProcessor | None = None,\n    processor: str | ProcessorMixin | None = None,\n    revision: str | None = None,\n    use_fast: bool = True,\n    token: str | bool | None = None,\n    device: int | str | torch.device | None = None,\n    device_map: str | dict[str, int | str] | None = None,\n    dtype: str | torch.dtype | None = \"auto\",\n    trust_remote_code: bool | None = None,\n    model_kwargs: dict[str, Any] | None = None,",
+      "collapsed": false,
+      "kind": "code",
+      "lang": "Python"
+    },
+    {
+      "id": "c8281350-350e-47b4-86e8-e1f4c8ffd0bf",
+      "depth": 1,
+      "title": "",
+      "body": "LESSON 3: the first thing that gets invoked for us. task is none, so this chunk runs and the result is pipeline_class is set to TextClassificationPipeline",
+      "collapsed": false,
+      "kind": "md",
+      "height": "fit"
+    },
+    {
+      "id": "2c6eefdb-ed16-4897-8098-9bd61525774a",
+      "depth": 1,
+      "title": "__init__.py:743 resolve task",
+      "body": "else:\n    normalized_task, targeted_task, task_options = check_task(task)\n    if pipeline_class is None:\n        pipeline_class = targeted_task[\"impl\"]",
+      "collapsed": false,
+      "kind": "code",
+      "lang": "Python"
+    },
+    {
+      "id": "1010c018-ae7d-491e-aec5-b5aef37ff47e",
+      "depth": 2,
+      "title": "__init__.py:131 SUPPORTED_TASKS",
+      "body": "# Register all the supported tasks here\nTASK_ALIASES = {\n    \"sentiment-analysis\": \"text-classification\",\n    \"ner\": \"token-classification\",\n    \"text-to-speech\": \"text-to-audio\",\n}\nSUPPORTED_TASKS = {\n    \"audio-classification\": {\n        \"impl\": AudioClassificationPipeline,\n        \"pt\": (AutoModelForAudioClassification,) if is_torch_available() else (),\n        \"default\": {\"model\": (\"superb/wav2vec2-base-superb-ks\", \"372e048\")},\n        \"type\": \"audio\",\n    },\n    \"automatic-speech-recognition\": {",
+      "collapsed": false,
+      "kind": "code",
+      "lang": "Python"
+    },
+    {
+      "id": "aa10a69f-55fa-42b6-adcf-c5c3e6608c91",
+      "depth": 2,
+      "title": "",
+      "body": "LESSON 1: Look here. get to know the big list of supported tasks, how they each have an impl (implementation) and pt (pytorch dispatcher class). and there's some task aliases here too, which just map to SUPPORTED_TASKS. we are doing 'sentiment-analysis' -> text-classification",
+      "collapsed": false,
+      "kind": "md",
+      "height": "fit"
+    },
+    {
+      "id": "5d81a7af-4655-4a3e-8572-c577c990b11c",
+      "depth": 1,
+      "title": "",
+      "body": "LESSON 4: this is invoked cuz we didn't specify model",
+      "collapsed": false,
+      "kind": "md",
+      "height": "fit"
+    },
+    {
+      "id": "abbb2f60-3156-49ad-ba1d-2b7d7db40930",
+      "depth": 1,
+      "title": "__init__.py:749 default model",
+      "body": "if model is None:\n    # fetches the default model (name) and default revision (commit) from the SUPPORTED_TASKS above\n    model, default_revision = get_default_model_and_revision(targeted_task, task_options) \n    revision = revision if revision is not None else default_revision\n    logger.warning( # you saw this msg\n        f\"No model was supplied, defaulted to {model} and revision {revision}.\\n\"\n        \"Using a pipeline without specifying a model name and revision in production is not recommended.\"\n    )\n    hub_kwargs[\"revision\"] = revision # this will be used to query the hub later\n    if config is None and isinstance(model, str):",
+      "collapsed": false,
+      "kind": "code",
+      "lang": "Python"
+    },
+    {
+      "id": "ea981821-2ad5-4cb5-b257-e24717577f3c",
+      "depth": 1,
+      "title": "",
+      "body": "LESSON 5: Okay, loading is finished. now, we will load all necessary preprocessing components for this pipeline, and construct the pipeline.\nthis pipeline() function will be responsible for loading the components, then Pipelines class (a root of TextClassificationPipeline and all pipelines) will be responsible for calling them in a __call__ function. the idea is pipelines will call preprocessing components independently, pass them all to inference components, then all to postprocessing.\nfirst section -- preprocessing. next few lines check which preprocessing classes the pipeline_class (TextClassification) uses.\ncheck the class def. You'll see just load_tokenizer is True, so we'll only be loading that.",
+      "collapsed": false,
+      "kind": "md",
+      "height": "fit"
+    },
+    {
+      "id": "b0dd3058-478b-44e9-9a34-9ec787965453",
+      "depth": 1,
+      "title": "__init__.py:870 which preprocessors",
+      "body": "load_tokenizer = pipeline_class._load_tokenizer\nload_feature_extractor = pipeline_class._load_feature_extractor\nload_image_processor = pipeline_class._load_image_processor\nload_processor = pipeline_class._load_processor\n\nif load_tokenizer or load_tokenizer is None:\n    try:\n        # Try to infer tokenizer from model or config name (if provided as str)\n        if tokenizer is None:",
+      "collapsed": false,
+      "kind": "code",
+      "lang": "Python"
+    },
+    {
+      "id": "cc5951e3-3612-449f-ba59-e5b421b6f469",
+      "depth": 2,
+      "title": "",
+      "body": "LESSON 6: we hit this. tokenizer is none so we set it to model_name, which is the distilbert/distilbert-base-uncased-finetuned-sst-2-english/tree/main\nTry to infer tokenizer from model or config name (if provided as str)",
+      "collapsed": false,
+      "kind": "md",
+      "height": "fit"
+    },
+    {
+      "id": "aa5bd55b-92db-4a7e-bced-fb4e07338303",
+      "depth": 2,
+      "title": "__init__.py:878 infer tokenizer",
+      "body": "# Try to infer tokenizer from model or config name (if provided as str)\nif tokenizer is None:\n    if isinstance(model_name, str):\n        tokenizer = model_name\n    elif isinstance(config, str):\n        tokenizer = config\n    else:\n        # Impossible to guess what is the right tokenizer here\n        raise Exception(\n            \"Impossible to guess which tokenizer to use. \"\n            \"Please provide a PreTrainedTokenizer class or a path/identifier to a pretrained tokenizer.\"\n        )\n\n\n# Instantiate tokenizer if needed\nif isinstance(tokenizer, (str, tuple)):\n    if isinstance(tokenizer, tuple):\n        # For tuple we have (tokenizer name, {kwargs})\n        use_fast = tokenizer[1].pop(\"use_fast\", use_fast)\n        tokenizer_identifier = tokenizer[0]\n        tokenizer_kwargs = tokenizer[1]\n    else: ",
+      "collapsed": false,
+      "kind": "code",
+      "lang": "Python"
+    },
+    {
+      "id": "50125792-c58a-495d-8bc4-65ab1886516c",
+      "depth": 3,
+      "title": "",
+      "body": "LESSON 7: we land here. we sent AutoTokenizer('distillbert tag name', use_fast=True...)\nAutoTokenizer is like AutoConfig, a dispatcher that creates objects.\nAutoTokenizer first looks up in the files for a tokenizer_config.json file, which is at https://huggingface.co/distilbert/distilbert-base-uncased-finetuned-sst-2-english/blob/main/tokenizer_config.json. contents:",
+      "collapsed": false,
+      "kind": "md",
+      "height": "fit"
+    },
+    {
+      "id": "0a04a5c8-4465-4628-acd6-f685db417d28",
+      "depth": 3,
+      "title": "__init__.py:900 AutoTokenizer",
+      "body": "tokenizer_identifier = tokenizer\ntokenizer_kwargs = model_kwargs.copy()\ntokenizer_kwargs.pop(\"torch_dtype\", None), tokenizer_kwargs.pop(\"dtype\", None)",
+      "collapsed": false,
+      "kind": "code",
+      "lang": "Python"
+    },
+    {
+      "id": "04272152-8f0f-4691-a23d-b52d217b196c",
+      "depth": 1,
+      "title": "",
+      "body": "LESSON 8: We've loaded all the preprocessing components.\nnow, we instantiate at the bottom:\nTextClassificationPipeline(model = the pytorch model we have, task = \"text-classification\", tokenizer=tokenizer we got above)\nnow go to textclassification.py",
+      "collapsed": false,
+      "kind": "md",
+      "height": "fit"
+    },
+    {
+      "id": "15a07166-2779-44f5-8c50-a1de9ae655dd",
+      "depth": 1,
+      "title": "__init__.py:1048 build the pipeline",
+      "body": "if tokenizer is not None:\n    kwargs[\"tokenizer\"] = tokenizer\n\nif feature_extractor is not None:\n    kwargs[\"feature_extractor\"] = feature_extractor\n\nif dtype is not None:\n    kwargs[\"dtype\"] = dtype\n\nif image_processor is not None:\n    kwargs[\"image_processor\"] = image_processor\n\nif device is not None:\n    kwargs[\"device\"] = device\n\nif processor is not None:\n    kwargs[\"processor\"] = processor\n\nreturn pipeline_class(model=model, task=task, **kwargs)",
+      "collapsed": false,
+      "kind": "code",
+      "lang": "Python"
+    },
+    {
+      "id": "1361b388-ff54-4778-9d3c-bb4e1ad64cc3",
+      "depth": 2,
+      "title": "textclassification.py:43 TextClassificationPipeline",
+      "body": "class TextClassificationPipeline(Pipeline):\n    \"\"\"\n    Text classification pipeline using any `ModelForSequenceClassification`. See the [sequence classification\n    examples](../task_summary#sequence-classification) for more information.\n\n    Example:\n\n    ```python\n    >>> from transformers import pipeline\n\n    >>> classifier = pipeline(model=\"distilbert/distilbert-base-uncased-finetuned-sst-2-english\")\n    >>> classifier(\"This movie is disgustingly good !\")\n    [{'label': 'POSITIVE', 'score': 1.0}]\n\n    >>> classifier(\"Director tried too much.\")\n    [{'label': 'NEGATIVE', 'score': 0.996}]\n    ```\n\n    Learn more about the basics of using a pipeline in the [pipeline tutorial](../pipeline_tutorial)\n\n    This text classification pipeline can currently be loaded from [`pipeline`] using the following task identifier:\n    `\"sentiment-analysis\"` (for classifying sequences according to positive or negative sentiments).\n\n    If multiple classification labels are available (`model.config.num_labels >= 2`), the pipeline will run a softmax\n    over the results. If there is a single label, the pipeline will run a sigmoid over the result. In case of regression\n    tasks (`model.config.problem_type == \"regression\"`), will not apply any function on the output.\n\n    The models that this pipeline can use are models that have been fine-tuned on a sequence classification task. See\n    the up-to-date list of available models on\n    [huggingface.co/models](https://huggingface.co/models?filter=text-classification).\n    \"\"\"\n\n    _load_processor = False\n    _load_image_processor = False\n    _load_feature_extractor = False\n    _load_tokenizer = True\n\n    function_to_apply = ClassificationFunction.NONE\n\n    def __init__(self, **kwargs):\n        super().__init__(**kwargs)\n\n        self.check_model_type(MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING_NAMES)",
+      "collapsed": false,
+      "kind": "code",
+      "lang": "Python"
+    },
+    {
+      "id": "450f7b29-5362-4308-8853-afdd4b5440e5",
+      "depth": 3,
+      "title": "base.py:1198 Pipeline.__call__",
+      "body": "def __call__(self, inputs, *args, num_workers=None, batch_size=None, **kwargs):\n    if args:\n        logger.warning(f\"Ignoring args : {args}\")\n\n    # Detect if inputs are a chat-style input(s) and cast as `Chat` or list of `Chat`\n    container_types = (list, tuple, types.GeneratorType)\n    if is_torch_available():\n        container_types = (*container_types, KeyDataset)\n    if isinstance(inputs, container_types):\n        if isinstance(inputs, types.GeneratorType):\n            inputs = list(inputs)\n        if is_valid_message(inputs[0]):\n            inputs = Chat(inputs)\n        elif isinstance(inputs[0], (list, tuple)) and all(chat and is_valid_message(chat[0]) for chat in inputs):\n            inputs = [Chat(chat) for chat in inputs]\n\n    if num_workers is None:\n        if self._num_workers is None:\n            num_workers = 0\n        else:\n            num_workers = self._num_workers\n    if batch_size is None:\n        if self._batch_size is None:\n            batch_size = 1\n        else:\n            batch_size = self._batch_size\n\n    preprocess_params, forward_params, postprocess_params = self._sanitize_parameters(**kwargs)\n\n    # Fuse __init__ params and __call__ params without modifying the __init__ ones.\n    preprocess_params = {**self._preprocess_params, **preprocess_params}\n    forward_params = {**self._forward_params, **forward_params}\n    postprocess_params = {**self._postprocess_params, **postprocess_params}\n\n    self.call_count += 1\n    if self.call_count > 10 and self.device.type == \"cuda\":\n        logger.warning_once(\n            \"You seem to be using the pipelines sequentially on GPU. In order to maximize efficiency please use a\"\n            \" dataset\",\n        )\n\n    is_dataset = Dataset is not None and isinstance(inputs, Dataset)\n    is_generator = isinstance(inputs, types.GeneratorType)",
+      "collapsed": false,
+      "kind": "code",
+      "lang": "Python"
+    },
+    {
+      "id": "08ec04d0-66a2-4f52-bd61-addfd8c208a5",
+      "depth": 4,
+      "title": "base.py:1275 run_single",
+      "body": "def run_single(self, inputs, preprocess_params, forward_params, postprocess_params):\n    model_inputs = self.preprocess(inputs, **preprocess_params)\n    model_outputs = self.forward(model_inputs, **forward_params)\n    outputs = self.postprocess(model_outputs, **postprocess_params)\n    return outputs",
+      "collapsed": false,
+      "kind": "code",
+      "lang": "Python"
+    },
+    {
+      "id": "0bb013e2-5f50-47bf-a1e3-5ba2d937c440",
+      "depth": 0,
+      "title": "LESSON 9 — the shape of it",
+      "body": "You're welcome to go dive into textclassification.py and base.py which defines its parent class Pipeline, but the flow is like this:\n\nthe initialization in the last line above sends the pytorch model, the tokenizer, and other preprocessing components to the TextClassificationPipeline constructor, which just passes them up to Pipeline to be saved in its __init__.\n\nWhen we invoke pipeline(), this invokes TextClasificationPipeline.__call__(), which invokes PIpeline.__call__(), which can handle a certain set of inputs dynamically - single string, list of string, Huggingface Dataset, iterable, etc. -- it will intelligently go through each. For example, if it's a single string, it will put it in a list and call the pipeline on the list. If it's a Huggingface Dataset, it will go through the dataset in batches and call the pipeline on each batch. PyTorch datasets/dataloader not easily supported.\n\nand when it calls the pipeline on it, it will call run_single, which:\ndef run_single(self, inputs, preprocess_params, forward_params, postprocess_params):\n    model_inputs = self.preprocess(inputs, **preprocess_params)\n    model_outputs = self.forward(model_inputs, **forward_params)\n    outputs = self.postprocess(model_outputs, **postprocess_params)\n    return outputs\n\nso you see, pipeline provies 3 steps scaffolding -- preprocess, forward, postprocess. and it just feeds one step's into the next. Really, you can do whatever the hell you want in each if you were to define your own pipeline. Only thing is:\n- preprocess and postprocess are abstract functions in Pipeline, must be fully implemented from scratch\n- self.forward has scaffolding to help you ensure all tensors are on same device and torch.eval + no_grad is on before it calls self._forward, which is an abstract function you must implement\n- the outputs of postprocess are what is returned and outwardly visible. this is where textclassification works its magic.\n\n\n\n\n\n\n\nFew more things to know:\n- You saw AutoModelForSequenceClassification, which is a dispatcher to look for model_type then an associated sequence-classifier class. as it loads this class, it needs to look for both core transformer weights and the weights for that classifier head.",
+      "collapsed": false,
+      "kind": "md",
+      "height": "fit"
+    }
+  ]
+}
