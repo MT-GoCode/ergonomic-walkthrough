@@ -6,26 +6,32 @@ export const FIXTURE = join(ROOT, 'tests/fixtures/hf-trace.walkthrough')
 
 type Launched = { app: ElectronApplication; page: Page }
 
-// Every launch gets its own userData, runs without taking focus, and leaves a trace.zip.
-export const test = base.extend<{ launch: (files?: string[]) => Promise<Launched> }>({
+// Every launch gets its own userData unless one is passed (to relaunch over it), runs
+// without taking focus, and leaves a trace.zip. Apps a test already quit or killed are skipped.
+export const test = base.extend<{
+  launch: (files?: string[], userData?: string) => Promise<Launched>
+}>({
   launch: async ({}, use, info) => {
     const apps: ElectronApplication[] = []
-    await use(async (files = []) => {
+    const exited = new Set<ElectronApplication>()
+    await use(async (files = [], userData = info.outputPath(`userdata-${apps.length}`)) => {
       const app = await _electron.launch({
         args: [join(ROOT, 'out/main/index.js'), ...files],
         env: {
           ...process.env,
           WT_SHOW_INACTIVE: '1',
-          WT_USER_DATA: info.outputPath(`userdata-${apps.length}`)
+          WT_USER_DATA: userData
         }
       })
       apps.push(app)
+      app.on('close', () => exited.add(app))
       await app.context().tracing.start({ screenshots: true, snapshots: true })
       const page = await app.firstWindow()
       await page.waitForSelector('.cell .cm-content')
       return { app, page }
     })
     for (const [k, app] of apps.entries()) {
+      if (exited.has(app)) continue
       await app.context().tracing.stop({ path: info.outputPath(`trace-${k}.zip`) })
       await app.close()
     }
