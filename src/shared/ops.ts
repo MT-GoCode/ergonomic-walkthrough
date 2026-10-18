@@ -117,12 +117,6 @@ export const setBody = (cs: Cells, i: number, body: string): Cells =>
     draft[i].body = body
   })
 
-export const setLang = (cs: Cells, i: number, lang: string): Cells =>
-  produce(cs, (draft) => {
-    const c = draft[i]
-    if (c.kind === 'code') c.lang = lang
-  })
-
 export const setHeight = (cs: Cells, i: number, height: 'fit' | number): Cells =>
   produce(cs, (draft) => {
     const c = draft[i]

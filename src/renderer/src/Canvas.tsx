@@ -1,7 +1,7 @@
 import { useMemo, useRef, type ReactNode } from 'react'
 import { insertModes, subtreeEnd } from '../../shared/ops'
-import { useAnchor } from './anchor'
-import { CellView, LangList } from './Cell'
+import { useReveal } from './reveal'
+import { CellView } from './Cell'
 import type { Settings } from '../../shared/settings'
 import { dispatch, type State } from './state'
 
@@ -10,9 +10,9 @@ type Props = Pick<State, 'cells' | 'focusId' | 'editingId'> & { settings: Settin
 export function Canvas({ cells, focusId, editingId, settings }: Props) {
   const scroller = useRef<HTMLDivElement>(null)
   const track = useRef<HTMLDivElement>(null)
-  // Anything that changes cell geometry re-anchors: content, settings, raw/rendered markdown.
+  // Anything that changes cell geometry re-checks the focused cell.
   const layout = useMemo(() => [cells, settings, editingId], [cells, settings, editingId])
-  const offset = useAnchor(scroller, track, layout)
+  const offset = useReveal(scroller, track, layout)
   // Flat list → nested groups: each cell is followed by its subtree in a guide column.
   const range = (from: number, to: number): ReactNode[] => {
     const out: ReactNode[] = []
@@ -54,7 +54,6 @@ export function Canvas({ cells, focusId, editingId, settings }: Props) {
     <div className="scroller" ref={scroller}>
       <div className="clip">
         <div className="track" ref={track} style={{ transform: `translateX(${-offset}px)` }}>
-          <LangList />
           {range(0, cells.length)}
         </div>
       </div>

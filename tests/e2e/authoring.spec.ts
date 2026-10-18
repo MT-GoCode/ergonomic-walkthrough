@@ -12,11 +12,15 @@ const cellTitled = async (page: Page, title: string) => {
   return page.locator('.cell').nth(i)
 }
 
-// Hover the bottom border of a cell and click one of its insert buttons.
+// Hover the bottom border of a cell and click one of its insert buttons. The buttons exist
+// only while hovered, so hover + click retry together if a loaded machine drops the hover.
 const insertBelow = async (page: Page, title: string, label: string) => {
   const strip = (await cellTitled(page, title)).locator(':scope > .strip')
-  await strip.hover()
-  await strip.getByRole('button', { name: label, exact: true }).click()
+  const button = strip.getByRole('button', { name: label, exact: true })
+  await expect(async () => {
+    await strip.hover()
+    await button.click({ timeout: 1000 })
+  }).toPass()
 }
 
 const shape = (json: string) =>
@@ -91,14 +95,6 @@ test('the markdown handle drags in whole lines between 1 and the window, double 
   const cell = page.locator('.cell.md').nth(1)
   const box = cell.locator('.mdbox')
   const handle = cell.locator(':scope > .strip .handle')
-  const drag = async (dy: number) => {
-    await cell.locator(':scope > .strip').hover()
-    const h = (await handle.boundingBox())!
-    await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2)
-    await page.mouse.down()
-    await page.mouse.move(h.x + h.width / 2, h.y + dy, { steps: 4 })
-    await page.mouse.up()
-  }
   const m = () =>
     box.evaluate((b) => ({
       h: b.getBoundingClientRect().height,
@@ -107,6 +103,20 @@ test('the markdown handle drags in whole lines between 1 and the window, double 
       win: innerHeight,
       content: b.scrollHeight
     }))
+  // The handle exists only while hovered; a drag that missed it (hover dropped) is retried.
+  const drag = async (dy: number) => {
+    const before = (await m()).h
+    await expect(async () => {
+      await cell.locator(':scope > .strip').hover()
+      const h = (await handle.boundingBox({ timeout: 1000 }))!
+      await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2)
+      await page.mouse.down()
+      await page.mouse.move(h.x + h.width / 2, h.y + dy, { steps: 4 })
+      await page.mouse.up()
+      expect((await m()).h).not.toBe(before)
+    }).toPass()
+  }
+
   await drag(10000)
   let s = await m()
   expect(s.h + s.title).toBeLessThanOrEqual(s.win)
@@ -170,7 +180,7 @@ test('pasted code loses its common indentation; a filename title picks the langu
   await expect.poll(async () => parseDoc((await last())!).cells[0].body).toBe('if x:\n    y()\nz()')
   await page.locator('.title').first().click()
   await page.keyboard.type('x.rs:1')
-  await expect(page.locator('input.lang').first()).toHaveValue('Rust')
+  await expect.poll(async () => parseDoc((await last())!).cells[0]).toMatchObject({ lang: 'Rust' })
 })
 
 test('⋯ → Delete with indented below removes exactly that subtree (kills: popup op routing)', async ({

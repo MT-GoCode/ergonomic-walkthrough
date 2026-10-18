@@ -20,9 +20,11 @@ import { readSession, writeSession, type Entry } from './session'
 // Main is the single owner of window state. `file.saved` is the text on disk, or null when
 // the file is gone, which leaves the window dirty until it is saved again. `live` is true
 // once the page has asked for its doc: only then can it hold edits or answer a flush.
+// `closing` is true while a close is being decided, so a second ⌘W cannot start another.
 type W = {
   win: BrowserWindow
   live: boolean
+  closing: boolean
   json: string
   autosave: Autosave | null
   file: { path: string; saved: string | null } | null
@@ -108,7 +110,7 @@ const onScreen = (b: Rectangle): boolean =>
         b.x < a.x + a.width && a.x < b.x + b.width && b.y < a.y + a.height && a.y < b.y + b.height
     )
 
-function createWindow(state: Omit<W, 'win' | 'live'>, bounds?: Rectangle): void {
+function createWindow(state: Omit<W, 'win' | 'live' | 'closing'>, bounds?: Rectangle): void {
   // 800px fits 88ch + 4 indent levels of Menlo 12 (7.22px/ch) plus the window frame.
   const win = new BrowserWindow({
     width: 800,
@@ -125,7 +127,7 @@ function createWindow(state: Omit<W, 'win' | 'live'>, bounds?: Rectangle): void 
       backgroundThrottling: false
     }
   })
-  const w: W = { win, live: false, ...state }
+  const w: W = { win, live: false, closing: false, ...state }
   wins.set(win.id, w)
   present(w)
   if (w.file) app.addRecentDocument(w.file.path)
@@ -138,6 +140,8 @@ function createWindow(state: Omit<W, 'win' | 'live'>, bounds?: Rectangle): void 
   win.on('close', (e) => {
     if (quitting) return
     e.preventDefault()
+    if (w.closing) return
+    w.closing = true
     void guarded(`Cannot close ${w.file ? basename(w.file.path) : 'Untitled'}`, async () => {
       await flush(w)
       if (dirty(w)) {
@@ -158,13 +162,20 @@ function createWindow(state: Omit<W, 'win' | 'live'>, bounds?: Rectangle): void 
         closed.push(entry(w))
       }
       win.destroy()
-    })
+    }).then(() => (w.closing = false)) // a cancelled or failed close can be retried
   })
   win.on('closed', () => {
     wins.delete(win.id)
     if (!quitting) saveSession()
   })
-  win.once('ready-to-show', () => (process.env.WT_SHOW_INACTIVE ? win.showInactive() : win.show()))
+  win.once('ready-to-show', () => {
+    if (!process.env.WT_INVISIBLE) return win.show()
+    // Test runs: on screen for Chromium (so it renders and measures as usual), but
+    // transparent, click-through and unfocused for whoever is using the machine.
+    win.setOpacity(0)
+    win.setIgnoreMouseEvents(true)
+    win.showInactive()
+  })
   const url = process.env.ELECTRON_RENDERER_URL
   if (url) win.loadURL(url)
   else win.loadFile(join(__dirname, '../renderer/index.html'))

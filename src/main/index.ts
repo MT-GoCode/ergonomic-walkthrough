@@ -5,6 +5,7 @@ import { settingsItem } from './settings'
 import { fileMenu, newWindow, openInitial, openPaths } from './windows'
 
 if (process.env.WT_USER_DATA) app.setPath('userData', process.env.WT_USER_DATA)
+if (process.env.WT_INVISIBLE) app.dock?.hide()
 
 // One instance per userData: two would both rewrite session.json. A second launch hands its
 // files to the first and exits without running quit handlers (which would save a session).

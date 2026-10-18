@@ -116,16 +116,16 @@ test.describe('ops', () => {
       'v4.2 loading',
       'index:134'
     ]
-    expect(cases.map((t) => ops.setTitle(ops.setLang(mk('c0 A'), 0, 'Go'), 0, t)[0])).toMatchObject(
-      [
-        { lang: 'Python' },
-        { lang: 'JavaScript' },
-        { lang: 'Rust' },
-        { lang: 'TypeScript' },
-        { lang: 'Go' },
-        { lang: 'Go' }
-      ]
-    )
+    expect(
+      cases.map((t) => ops.setTitle([{ ...mk('c0 A')[0], lang: 'Go' }], 0, t)[0])
+    ).toMatchObject([
+      { lang: 'Python' },
+      { lang: 'JavaScript' },
+      { lang: 'Rust' },
+      { lang: 'TypeScript' },
+      { lang: 'Go' },
+      { lang: 'Go' }
+    ])
     expect(lang('balls')).toBe('Python')
   })
   test('dedent strips the common indent only (kills: min over blank lines)', () => {

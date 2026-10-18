@@ -1,41 +1,10 @@
-import { memo, useEffect, useRef, useState, type PointerEvent } from 'react'
+import { memo, useEffect, useRef, type PointerEvent } from 'react'
 import type { Cell, Kind } from '../../shared/doc'
 import type { Mode } from '../../shared/ops'
 import { CodeBody } from './CodeBody'
 import { titleKey } from './focus'
-import { LANGS, langNamed } from './langs'
 import { MdBody } from './MdBody'
 import { dispatch } from './state'
-
-// One datalist shared by every cell: per-cell option lists would put 143 × cells
-// nodes in the DOM, and style recalc over them dominates opening a large trace.
-export const LangList = (): React.JSX.Element => (
-  <datalist id="langs">
-    {LANGS.map((n) => (
-      <option key={n} value={n} />
-    ))}
-  </datalist>
-)
-
-// Type to filter; only an exact language name is committed, anything else reverts on blur.
-function LangInput({ id, lang }: { id: string; lang: string }): React.JSX.Element {
-  const [draft, setDraft] = useState<string | null>(null)
-  return (
-    <input
-      className="lang"
-      list="langs"
-      spellCheck={false}
-      value={draft ?? lang}
-      onFocus={(e) => e.currentTarget.select()}
-      onChange={(e) => {
-        const name = langNamed(e.target.value)
-        if (name) dispatch({ a: 'lang', id, text: name })
-        setDraft(name ? null : e.target.value)
-      }}
-      onBlur={() => setDraft(null)}
-    />
-  )
-}
 
 type Props = { cell: Cell; focused: boolean; editing: boolean; canIn: boolean; canOut: boolean }
 
@@ -67,7 +36,6 @@ export const CellView = memo(function CellView({ cell, focused, editing, canIn, 
           onChange={(e) => dispatch({ a: 'title', id, text: e.target.value })}
           onKeyDown={(e) => titleKey(e, dispatch)}
         />
-        {cell.kind === 'code' && <LangInput id={id} lang={cell.lang} />}
         <button className="more" tabIndex={-1} onClick={() => window.api.popupCellMenu(id)}>
           ⋯
         </button>

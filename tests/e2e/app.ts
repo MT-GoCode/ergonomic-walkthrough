@@ -33,7 +33,7 @@ export const test = base.extend<{
               ],
           env: {
             ...process.env,
-            WT_SHOW_INACTIVE: '1',
+            WT_INVISIBLE: '1',
             WT_USER_DATA: userData
           }
         })

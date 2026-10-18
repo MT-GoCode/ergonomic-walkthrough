@@ -18,7 +18,7 @@ export type Action =
   | { a: 'edit'; id: string | null }
   | { a: 'insert'; id: string; mode: ops.Mode; kind: Kind }
   | { a: 'remove' | 'removeIndented' | 'indent' | 'outdent' | 'toggle'; id: string }
-  | { a: 'title' | 'body' | 'lang'; id: string; text: string }
+  | { a: 'title' | 'body'; id: string; text: string }
   | { a: 'height'; id: string; h: 'fit' | number }
 
 // Focus lands on the visible cell just above the deleted one, so the keyboard keeps its place.
@@ -61,8 +61,6 @@ function edit(
       return [ops.setTitle(cells, i, act.text), act.id]
     case 'body':
       return [ops.setBody(cells, i, act.text), act.id]
-    case 'lang':
-      return [ops.setLang(cells, i, act.text), act.id]
     case 'height':
       return [ops.setHeight(cells, i, act.h), act.id]
   }

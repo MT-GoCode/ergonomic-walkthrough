@@ -4,8 +4,8 @@ import { expect, test } from './app'
 
 // Opening 300 cells × 60 lines (18k lines) is gated on Chromium's work counters, which
 // are identical run to run and immune to machine load (wall and CPU time are not on
-// Apple Silicon). Measured 2026-10-16; any increase is a regression, a decrease a new floor.
-const BUDGET = { RecalcStyleCount: 1508, LayoutCount: 907, elements: 54334 }
+// Apple Silicon). Measured 2026-10-17; any increase is a regression, a decrease a new floor.
+const BUDGET = { RecalcStyleCount: 1505, LayoutCount: 904, elements: 53890 }
 
 test('opening a 300-cell, 18k-line trace does no more style, layout or DOM work than measured', async ({
   launch

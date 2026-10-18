@@ -23,8 +23,8 @@ body {
 }
 .track {
   transition: transform 125ms ease-out; /* VS Code's smooth-scroll duration */
-  /* VS Code's scrollBeyondLastLine: the last cell can reach the 10% anchor line. */
-  padding-bottom: 90vh;
+  /* room for the last cell's insert buttons, which hang below its border */
+  padding-bottom: calc(var(--lh) * 2);
 }
 .cell {
   /* cols characters of text + CodeMirror line padding (2 × 4px) + borders */
@@ -64,11 +64,6 @@ body {
 .titlebar .title::placeholder {
   color: #6e6e6e;
   font-weight: normal;
-}
-.lang {
-  color: #cccccc;
-  field-sizing: content;
-  padding: 0 1ch;
 }
 .more {
   width: 3ch;

@@ -332,11 +332,15 @@ test('a save issued right after a keystroke always contains it, 20 times in a ro
   const path = info.outputPath('race.walkthrough')
   copyFileSync(FIXTURE, path)
   const { app, page } = await launch([path])
-  const id = await winId(app, page)
   await page.locator('.cell.code .cm-content').first().click()
   for (let k = 0; k < 20; k++) {
-    await page.keyboard.type(`#${k}`)
-    await click(app, 'save', id)
+    // Keystrokes and ⌘S issued from main in one tick: the save request reaches the page right
+    // behind the input, as when someone saves the instant they stop typing.
+    await app.evaluate(({ BrowserWindow, Menu }, mark) => {
+      const w = BrowserWindow.getAllWindows()[0]
+      for (const ch of mark) w.webContents.sendInputEvent({ type: 'char', keyCode: ch })
+      Menu.getApplicationMenu()!.getMenuItemById('save')!.click(undefined, w)
+    }, `#${k}`)
     await expect.poll(() => readFileSync(path, 'utf8')).toContain(`#${k}`)
   }
   expect((await windows(app)).map((w) => w.edited)).toEqual([false])
@@ -431,4 +435,38 @@ test('a window closed before its page has loaded closes at once (kills: flush aw
     all.sort((a, b) => b.id - a.id)[0].close()
   })
   await expect.poll(() => count(app)).toBe(1)
+})
+
+test("closing a window twice in a row prompts once; Cancel keeps it, Don't Save closes it once with no error (kills: re-entrant close)", async ({
+  launch
+}, info) => {
+  const file = info.outputPath('twice.walkthrough')
+  copyFileSync(FIXTURE, file)
+  const { app, page } = await launch([file])
+  await typeIn(page, 'edit')
+  await expect.poll(async () => (await windows(app))[0].edited).toBe(true)
+  type S = { prompts: number; errors: string[]; answer: number }
+  await app.evaluate(({ dialog }) => {
+    const g = globalThis as unknown as S
+    Object.assign(g, { prompts: 0, errors: [], answer: 2 })
+    dialog.showMessageBoxSync = (() => (g.prompts++, g.answer)) as never
+    dialog.showErrorBox = ((title: string) => g.errors.push(title)) as never
+  })
+  const closeTwice = () =>
+    app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows()[0]
+      w.close()
+      w.close()
+    })
+  const state = () => app.evaluate(() => ({ ...(globalThis as unknown as S) }))
+  // Cancel keeps the window alive, so a second close chain, if any, would reach its own prompt.
+  await closeTwice()
+  await expect.poll(async () => (await state()).prompts).toBe(1)
+  await page.evaluate(() => new Promise((r) => setTimeout(r, 100))) // let any second chain's flush land
+  expect(await state()).toMatchObject({ prompts: 1, errors: [] })
+  expect(await count(app)).toBe(1)
+  await app.evaluate(() => void ((globalThis as unknown as S).answer = 1))
+  await closeTwice()
+  await expect.poll(() => count(app)).toBe(0)
+  expect(await state()).toMatchObject({ prompts: 2, errors: [] })
 })

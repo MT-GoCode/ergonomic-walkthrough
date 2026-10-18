@@ -48,9 +48,8 @@ mutate $R/focus.ts 's/isMd\(cell\) \? next && focusTitle\(next\) : focusBody/foc
 mutate $R/Cell.tsx 's/, d\.max\)/, Infinity)/' 'resize unclamped'
 mutate $R/CodeBody.tsx 's/crossCellArrows, pasteDedented,/crossCellArrows,/' 'paste not dedented'
 mutate $R/state.ts "s/act\.a === 'insert' && act\.kind === 'md' \? focusId : s\.editingId/s.editingId/" 'new markdown cell not raw'
-mutate $R/anchor.ts 's/setOffset\(Math\.min\(Math\.max\(left \+ width - sc\.clientWidth, 0\), left\)\)/setOffset(0)/' 'anchor never slides'
-mutate $R/anchor.ts 's/if \(pinned\.current \|\| frame\) return/if (frame) return/' 'focus pin ignored on scroll'
-mutate $R/theme.css 's/padding-bottom: 90vh;/padding-bottom: var(--lh);/' 'last cell cannot reach the anchor line'
+mutate $R/reveal.ts 's/left < o \|\| right > o \+ sc\.clientWidth \? left : o/o/' 'focus never reveals'
+mutate $R/reveal.ts 's/left < o \|\| right/right/' 'a cell off to the left is not revealed'
 mutate $R/theme.css 's/\.clip \{\n  overflow: clip;/.clip {\n  overflow: visible;/' 'clip layer removed'
 M=src/main
 mutate $R/state.ts 's/if \(edited\) window\.api\.docChanged\(serializeDoc\(next\.cells\)\)/if (edited) requestAnimationFrame(() => window.api.docChanged(serializeDoc(next.cells)))/' 'edits pushed a frame late'
@@ -61,6 +60,7 @@ mutate $M/windows.ts 's/saveSession\(\)(\s*)quitting = true/quitting = true/' 's
 mutate $M/windows.ts 's/(w\.file\.saved = w\.json\s*present\(w\))\s*await dropAutosave\(w\)/$1/' 'save keeps the stale autosave'
 mutate $M/windows.ts 's/if \(!ok\) return false/if (!ok) return true/' 'failed save reported as saved'
 mutate $M/windows.ts 's/if \(!w\.live \|\| /if (/' 'flush waits for a page that is not listening'
+mutate $M/windows.ts 's/if \(w\.closing\) return\n//' 'a second close starts another'
 mutate $R/Cell.tsx 's/!root\.current!\.contains\(document\.activeElement\)/false/' 'focus does not follow the focused cell'
 npx electron-vite build >/dev/null # never leave a mutant's build in out/
 exit $fail

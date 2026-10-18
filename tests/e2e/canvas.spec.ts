@@ -68,23 +68,23 @@ test('typing pushes the edited doc to main, and opening one does not (kills: rev
   await expect.poll(async () => parseDoc((await last())!).cells[1].body).toContain('# traced')
 })
 
-test('only an exact language name re-highlights; partial text reverts (kills: draft committed / extension not reconfigured)', async ({
+test('a filename in the title re-highlights; a title without one keeps the language (kills: extension not reconfigured)', async ({
   launch
 }) => {
   const { page } = await launch()
   await page.locator('.cm-content').first().click()
-  await page.keyboard.type('def f(): return "s"')
+  await page.keyboard.type('# heading')
   const spans = () =>
     page.locator('.cm-line span').evaluateAll((s) => s.map((e) => e.className).join(' '))
   await expect.poll(spans).not.toBe('')
   const python = await spans()
-  const lang = page.locator('input.lang').first()
-  await lang.fill('Mark')
-  await lang.blur()
-  await expect(lang).toHaveValue('Python')
-  expect(await spans()).toBe(python)
-  await lang.fill('Markdown')
+  const title = page.locator('.title').first()
+  await title.fill('README.md')
   await expect.poll(spans).not.toBe(python)
+  const markdown = await spans()
+  await title.fill('just notes')
+  await page.waitForTimeout(300) // a language load would land within this
+  expect(await spans()).toBe(markdown)
 })
 
 test('clicking a guide folds exactly its subtree and the placeholder counts it (kills: range bounds)', async ({

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Settings } from '../../shared/settings'
-import { langNamed } from './langs'
+import { LANGS, langNamed } from './langs'
 
 type Field = { key: keyof Settings; label: string; type: 'text' | 'number'; list?: string }
 const FIELDS: Field[] = [
@@ -19,7 +19,7 @@ export function SettingsModal({ settings, close }: { settings: Settings; close: 
     fontSize: String(settings.fontSize),
     cols: String(settings.cols)
   }))
-  // Fields are text; the language matches case-insensitively, like the title-bar field.
+  // Fields are text; the language matches case-insensitively.
   const parse = (d: typeof draft) =>
     Settings.safeParse({
       defaultLang: langNamed(d.defaultLang) ?? d.defaultLang,
@@ -43,6 +43,11 @@ export function SettingsModal({ settings, close }: { settings: Settings; close: 
         onKeyDown={(e) => (e.key === 'Escape' ? done() : e.key === 'Enter' && commit())}
       >
         <div className="settings-title">Settings</div>
+        <datalist id="langs">
+          {LANGS.map((n) => (
+            <option key={n} value={n} />
+          ))}
+        </datalist>
         {FIELDS.map((f, i) => (
           <label key={f.key}>
             <span>{f.label}</span>

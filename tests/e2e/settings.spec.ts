@@ -1,6 +1,7 @@
 import { writeFileSync } from 'fs'
 import type { Page } from '@playwright/test'
-import { click, expect, test, winId } from './app'
+import { parseDoc } from '../../src/shared/doc'
+import { click, expect, recordPushes, test, winId } from './app'
 
 // Does exactly n characters fit on the first line of the first code cell?
 const fits = async (page: Page, n: number) => {
@@ -46,6 +47,7 @@ test('the default language, typed in any case, is what the next new code cell ge
   launch
 }) => {
   const { app, page } = await launch()
+  const last = await recordPushes(app)
   await openSettings(app, page)
   await page.locator('input[name=defaultLang]').fill('Rus')
   await expect(page.locator('input[name=defaultLang]')).toHaveClass(/invalid/)
@@ -54,7 +56,7 @@ test('the default language, typed in any case, is what the next new code cell ge
   const strip = page.locator('.cell > .strip').first()
   await strip.hover()
   await strip.getByRole('button', { name: '+ Code', exact: true }).click()
-  await expect(page.locator('input.lang').nth(1)).toHaveValue('Rust')
+  await expect.poll(async () => parseDoc((await last())!).cells[1]).toMatchObject({ lang: 'Rust' })
 })
 
 test('an invalid value is marked and never sent (kills: unvalidated setSettings)', async ({
