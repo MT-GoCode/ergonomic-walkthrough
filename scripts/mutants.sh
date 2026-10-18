@@ -1,11 +1,16 @@
 #!/bin/bash
 # Mutation check: each mutant must turn its suite red (unit for src/shared, else a rebuild
-# + e2e). Usage: scripts/mutants.sh
-cd "$(dirname "$0")/.." || exit 1
+# + e2e). Runs in a throwaway copy of the working tree, so the checkout is never touched,
+# even if the run is killed. Usage: scripts/mutants.sh
+root="$(cd "$(dirname "$0")/.." && pwd)"
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+rsync -a --exclude node_modules --exclude out --exclude dist --exclude test-results \
+  --exclude playwright-report --exclude .git "$root/" "$work/"
+ln -s "$root/node_modules" "$work/node_modules"
+cd "$work" || exit 1
 fail=0
 bak=$(mktemp)
-file=
-trap '[ -n "$file" ] && cp "$bak" "$file"' EXIT INT TERM
 suite() { # unit mutants need only the unit project; renderer mutants need a rebuild + e2e
   case $1 in
     src/shared/*) npx playwright test --project=unit -x --reporter=dot ;;
@@ -13,14 +18,12 @@ suite() { # unit mutants need only the unit project; renderer mutants need a reb
   esac
 }
 mutate() { # file, perl substitution, description
-  file=$1
   cp "$1" "$bak"
   perl -0pi -e "$2" "$1"
   if cmp -s "$1" "$bak"; then echo "NOT APPLIED: $3"; fail=1
   elif suite "$1" >/dev/null 2>&1; then echo "SURVIVED: $3"; fail=1
   else echo "killed: $3"; fi
   cp "$bak" "$1"
-  file=
 }
 O=src/shared/ops.ts; D=src/shared/doc.ts
 mutate $O 's/if \(kids && !cs\[i\]\.collapsed\)/if (false)/' 'open parent treated as leaf'
@@ -52,7 +55,7 @@ mutate $R/reveal.ts 's/left < o \|\| right > o \+ sc\.clientWidth \? left : o/o/
 mutate $R/reveal.ts 's/left < o \|\| right/right/' 'a cell off to the left is not revealed'
 mutate $R/theme.css 's/\.clip \{\n  overflow: clip;/.clip {\n  overflow: visible;/' 'clip layer removed'
 M=src/main
-mutate $R/state.ts 's/if \(edited\) window\.api\.docChanged\(serializeDoc\(next\.cells\)\)/if (edited) requestAnimationFrame(() => window.api.docChanged(serializeDoc(next.cells)))/' 'edits pushed a frame late'
+mutate $R/state.ts 's/if \(edited\) window\.api\.docChanged\(serializeDoc\(next\.cells\)\)/if (edited) setTimeout(() => window.api.docChanged(serializeDoc(next.cells)), 50)/' 'edits pushed 50ms late'
 mutate $M/windows.ts 's/w\.file !== null && w\.json !== w\.file\.saved/w.json !== w.file?.saved/' 'untitled windows count as dirty'
 mutate $M/windows.ts 's/w\.file\.saved = w\.json\n//' 'save does not record the saved text'
 mutate $M/windows.ts 's/auto \?\?(\s*)saved \?\?/saved ??$1auto ??/' 'file preferred over autosave'
@@ -62,5 +65,4 @@ mutate $M/windows.ts 's/if \(!ok\) return false/if (!ok) return true/' 'failed s
 mutate $M/windows.ts 's/if \(!w\.live \|\| /if (/' 'flush waits for a page that is not listening'
 mutate $M/windows.ts 's/if \(w\.closing\) return\n//' 'a second close starts another'
 mutate $R/Cell.tsx 's/!root\.current!\.contains\(document\.activeElement\)/false/' 'focus does not follow the focused cell'
-npx electron-vite build >/dev/null # never leave a mutant's build in out/
 exit $fail

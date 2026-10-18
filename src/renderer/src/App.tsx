@@ -26,8 +26,10 @@ export function App() {
         case 'openSettings':
           return setSettingsOpen(true)
         case 'flush':
-          // Every applied edit was pushed when it was dispatched; this reply follows them.
-          return window.api.flushed(c.n)
+          // Edits are pushed as they are applied, but a keystroke sent just before the flush
+          // may still be in Chromium's input pipeline, which IPC can overtake. Input that was
+          // sent earlier is handled before the next frame, so answer after it.
+          return requestAnimationFrame(() => setTimeout(() => window.api.flushed(c.n)))
         default:
           return c satisfies never
       }

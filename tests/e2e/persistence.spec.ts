@@ -97,7 +97,7 @@ test('quit and relaunch restores every window with its doc, bounds and dirty sta
   // Bounds change after the last path change, so only the quit-time session write records them.
   await app.evaluate(({ BrowserWindow }) =>
     BrowserWindow.getAllWindows().forEach((w, i) =>
-      w.setBounds({ x: 40 + 90 * i, y: 60 + 50 * i, width: 700, height: 640 - 40 * i })
+      w.setBounds({ x: 40 + 90 * i, y: 60 + 50 * i, width: 700, height: 400 - 40 * i })
     )
   )
   const before = await windows(app)
@@ -114,7 +114,8 @@ test('quit and relaunch restores every window with its doc, bounds and dirty sta
   expect(after.map(({ title, edited }) => ({ title, edited }))).toEqual(
     before.map(({ title, edited }) => ({ title, edited }))
   )
-  // macOS may nudge a restored window by a pixel to keep it on screen (seen on CI displays).
+  // Sizes fit any display (CI runners have small ones), so macOS has no reason to move them;
+  // it may still round a coordinate by a pixel.
   after.forEach((w, i) =>
     (['x', 'y', 'width', 'height'] as const).forEach((k) =>
       expect(Math.abs(w.bounds[k] - before[i].bounds[k]), `${w.title} ${k}`).toBeLessThanOrEqual(1)
