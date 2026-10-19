@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import { parseDoc } from '../../src/shared/doc'
-import { expect, FIXTURE, recordPushes, test } from './app'
+import { click, expect, FIXTURE, recordPushes, test, winId } from './app'
 
 const cellTitled = async (page: Page, title: string) => {
   const i = await page.$$eval(
@@ -234,4 +234,59 @@ test('shift-click selects the range in document order; Tab / Shift+Tab move it a
   await expect(page.locator('.cell.selected')).not.toHaveCount(0)
   await page.keyboard.press('ArrowUp')
   await expect(page.locator('.cell.selected')).toHaveCount(0)
+})
+
+test('⌘⇧Z undoes a cell action and ⌘⇧Y redoes it, keeping text typed since (kills: cell history)', async ({
+  launch
+}) => {
+  const { app, page } = await launch([FIXTURE])
+  const last = await recordPushes(app)
+  const id = await winId(app, page)
+  await app.evaluate(({ Menu }) => {
+    Menu.prototype.popup = function () {
+      this.getMenuItemById('removeIndented')!.click()
+    }
+  })
+  await (await cellTitled(page, '__init__.py:743 resolve task')).locator('.more').click()
+  await expect(page.locator('.cell')).toHaveCount(17)
+  await page.locator('.cell.code .cm-content').first().click()
+  await page.keyboard.insertText('TYPED_AFTER ')
+  await click(app, 'cell-undo', id)
+  await expect(page.locator('.cell')).toHaveCount(20)
+  const doc = async () => parseDoc((await last())!).cells
+  await expect
+    .poll(async () => (await doc()).map((c) => c.title))
+    .toContain('__init__.py:131 SUPPORTED_TASKS')
+  expect((await doc())[1].body).toContain('TYPED_AFTER')
+  await click(app, 'cell-redo', id)
+  await expect(page.locator('.cell')).toHaveCount(17)
+})
+
+test('⌘-hover between two code lines shows the insert line; a click splits the cell there (kills: split)', async ({
+  launch
+}) => {
+  const { app, page } = await launch()
+  const last = await recordPushes(app)
+  await page.locator('.cm-content').first().click()
+  await page.keyboard.insertText('l1\nl2\nl3\nl4')
+  await page.locator('.title').first().fill('main.py:10')
+  const line2 = (await page.locator('.cm-line').nth(1).boundingBox())!
+  await page.keyboard.down('Meta')
+  await page.mouse.move(line2.x + 40, line2.y + line2.height - 3) // lower half of line 2
+  const cut = page.locator('.cutline')
+  await expect(cut).toBeVisible()
+  await cut.getByRole('button', { name: '+ MD', exact: true }).click()
+  await page.keyboard.up('Meta')
+  const cells = async () => parseDoc((await last())!).cells
+  await expect
+    .poll(async () => (await cells()).map((c) => [c.kind, c.depth, c.title, c.body]))
+    .toEqual([
+      ['code', 0, 'main.py:10', 'l1\nl2'],
+      ['md', 0, '', ''],
+      ['code', 0, 'main.py:10', 'l3\nl4']
+    ])
+  await expect(cut).toHaveCount(0)
+  // The split is one cell action: ⌘⇧Z rejoins the halves.
+  await click(app, 'cell-undo', await winId(app, page))
+  await expect.poll(async () => (await cells()).map((c) => c.body)).toEqual(['l1\nl2\nl3\nl4'])
 })

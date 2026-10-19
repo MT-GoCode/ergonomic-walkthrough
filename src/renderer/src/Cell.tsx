@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, type PointerEvent } from 'react'
-import type { Cell, Kind } from '../../shared/doc'
-import type { Mode } from '../../shared/ops'
+import type { Cell } from '../../shared/doc'
+import { BUTTONS } from './buttons'
 import { CodeBody } from './CodeBody'
 import { titleKey } from './focus'
 import { MdBody } from './MdBody'
@@ -68,17 +68,9 @@ export const CellView = memo(function CellView({
   )
 })
 
-const BUTTONS: [Mode, Kind, string][] = [
-  ['same', 'code', '+ Code'],
-  ['same', 'md', '+ MD'],
-  ['in', 'code', '+ Code ⇥'],
-  ['in', 'md', '+ MD ⇥'],
-  ['out', 'code', '+ Code ⇤'],
-  ['out', 'md', '+ MD ⇤']
-]
-
-// A half-line hover zone straddling the bottom border. Disabled ⇥ buttons stay
-// in place so the others never shift under the pointer; ⇤ exists only at a group's end.
+// A quarter-line hover band inside the bottom edge; its buttons hang below the border.
+// Disabled ⇥ buttons stay in place so the others never shift under the pointer; ⇤ exists
+// only at a group's end.
 function InsertStrip({
   id,
   canIn,

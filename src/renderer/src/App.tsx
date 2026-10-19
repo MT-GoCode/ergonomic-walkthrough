@@ -39,6 +39,8 @@ export function App() {
           return dispatch({ a: 'settings', defaultLang: c.s.defaultLang })
         case 'openSettings':
           return setSettingsOpen(true)
+        case 'cellHistory':
+          return dispatch({ a: c.op })
         case 'flush':
           // Edits are pushed as they are applied, but a keystroke sent just before the flush
           // may still be in Chromium's input pipeline, which IPC can overtake. Input that was

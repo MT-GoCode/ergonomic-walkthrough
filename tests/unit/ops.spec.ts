@@ -110,6 +110,31 @@ test.describe('ops', () => {
     const cs = mk('c0 A', 'c1 B', 'c0 C')
     expect(ops.outdent(cs, 1, 2)).toBe(cs)
   })
+  test('split cuts the body; the continuation keeps title, language and depth and takes the children (kills: split)', () => {
+    const cs = mk('c0 A', 'c1 F+', 'c2 G', 'c0 Z')
+    cs[1] = { ...cs[1], body: 'a\nb\nc' }
+    const out = ops.split(cs, 1, 2, 'R')
+    expect(shape(out)).toEqual(['c0 A', 'c1 F', 'c1 F+', 'c2 G', 'c0 Z'])
+    expect(out.map((c) => c.body)).toEqual(['', 'a\nb', 'c', '', ''])
+    expect(out[2]).toMatchObject({ id: 'R', lang: 'Python' })
+  })
+  test('undo restores structure but keeps text typed since; undoing a split rejoins it (kills: restore)', () => {
+    const before = mk('c0 A', 'c0 B', 'c0 C')
+    const after = ops.indent(before, 1)
+    // After the indent, B's text is edited: undo must keep that edit.
+    const now = ops.setBody(after, 1, 'typed later')
+    const undone = ops.restore(before, after, now)
+    expect(shape(undone)).toEqual(['c0 A', 'c0 B', 'c0 C'])
+    expect(undone[1].body).toBe('typed later')
+    // Deleted cells come back with their text; inserted cells go.
+    const withText = ops.setBody(before, 2, 'kept')
+    const removed = ops.removeWithIndented(withText, 2, mk('c0 blank')[0])
+    expect(ops.restore(withText, removed, removed)[2].body).toBe('kept')
+    // A split's own body change is part of the action, so undo rejoins the halves.
+    const one = [{ ...mk('c0 S')[0], body: 'x\ny' }]
+    const cut = ops.split(one, 0, 1, 'R')
+    expect(ops.restore(one, cut, cut)).toEqual(one)
+  })
   test('outdenting a collapsed cell opens it so adopted siblings stay visible (kills: outdent expand removed)', () => {
     const cs = ops.outdent(mk('c0 A', 'c1 B+', 'c2 C', 'c1 D'), 1)
     expect(shape(cs)).toEqual(['c0 A', 'c0 B', 'c1 C', 'c1 D'])

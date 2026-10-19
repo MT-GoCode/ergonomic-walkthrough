@@ -1,0 +1,32 @@
+// Every shortcut and gesture, as listed in Settings, in macOS notation (⌃⌥⇧⌘ order). A test
+// checks that each app-menu accelerator appears here, so the menus and this list cannot drift.
+export const SHORTCUTS: [keys: string, action: string][] = [
+  ['Hover a cell’s bottom edge', 'Insert: + Code, + MD, ⇥ indented, ⇤ one level out'],
+  ['⌘-hover over code', 'Split the cell between two lines and insert there'],
+  ['Tab / ⇧Tab in a title', 'Indent / outdent the cell with its children'],
+  ['Enter or ↓ in a title', 'Into the body (markdown: edit raw)'],
+  ['↑ / ↓', 'Move between titles and bodies across cells'],
+  ['Double-click markdown', 'Edit raw'],
+  ['⌘↩ / ⇧↩ in raw markdown', 'Render and return to the title'],
+  ['⇧-click another cell', 'Select every cell from the focused one to it'],
+  ['Tab / ⇧Tab with a selection', 'Indent / outdent the whole selection'],
+  ['Esc with a selection', 'End the selection'],
+  ['Click a guide line', 'Collapse / expand the indented group'],
+  ['⋯ on a title bar', 'Delete / delete with indented below'],
+  ['⌘Z / ⌘Y', 'Undo / redo text'],
+  ['⇧⌘Z / ⇧⌘Y', 'Undo / redo a cell action (insert, delete, indent, collapse, split)'],
+  ['⌘N', 'New window'],
+  ['⌘O', 'Open…'],
+  ['⌘S / ⇧⌘S', 'Save / Save As…'],
+  ['⌘W', 'Close window'],
+  ['⇧⌘T', 'Reopen the last closed window'],
+  ['⌘,', 'Settings'],
+  ['⌘X / ⌘C / ⌘V / ⌘A', 'Cut / copy / paste / select all'],
+  ['⌘0 / ⌘+ / ⌘-', 'Actual size / zoom in / zoom out'],
+  ['⌃⌘F', 'Full screen'],
+  ['⌘M', 'Minimize'],
+  ['⌘H / ⌥⌘H', 'Hide / hide others'],
+  ['⌘Q', 'Quit (every window comes back on relaunch)'],
+  ['⌘R / ⇧⌘R', 'Reload / force-reload the window'],
+  ['⌥⌘I', 'Developer tools']
+]

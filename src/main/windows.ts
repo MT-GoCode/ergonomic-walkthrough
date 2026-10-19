@@ -332,6 +332,7 @@ export const fileMenu = (): MenuItemConstructorOptions[] => [
       { type: 'separator' },
       { id: 'save', label: 'Save', accelerator: 'CmdOrCtrl+S', click: onWin(save) },
       { id: 'saveAs', label: 'Save As…', accelerator: 'CmdOrCtrl+Shift+S', click: onWin(saveAs) },
+      { role: 'close' },
       { type: 'separator' },
       {
         id: 'revealAutosaves',

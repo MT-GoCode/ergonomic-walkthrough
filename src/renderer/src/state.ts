@@ -11,7 +11,11 @@ export type State = {
   selectTo: string | null
   defaultLang: string
   rev: number
+  // Cell-level history: each structural action's cells before and after (⌘⇧Z / ⌘⇧Y).
+  undo: Step[]
+  redo: Step[]
 }
+type Step = { before: Cell[]; after: Cell[] }
 
 export type Action =
   | { a: 'init'; cells: Cell[]; defaultLang: string }
@@ -20,6 +24,9 @@ export type Action =
   | { a: 'edit'; id: string | null }
   | { a: 'select'; id: string | null }
   | { a: 'insert'; id: string; mode: ops.Mode; kind: Kind }
+  | { a: 'split'; id: string; at: number; mode: 'same' | 'in'; kind: Kind }
+  | { a: 'undo' }
+  | { a: 'redo' }
   | { a: 'remove' | 'removeIndented' | 'toggle'; id: string }
   | { a: 'indent' | 'outdent'; id: string; to?: string }
   | { a: 'title' | 'body'; id: string; text: string }
@@ -43,7 +50,7 @@ function afterDelete(before: Cell[], i: number, after: Cell[]): [Cell[], string 
 // Returns the next cells and the next focused id.
 function edit(
   cells: Cell[],
-  act: Exclude<Action, { a: 'init' | 'settings' | 'focus' | 'edit' | 'select' }>,
+  act: Exclude<Action, { a: 'init' | 'settings' | 'focus' | 'edit' | 'select' | 'undo' | 'redo' }>,
   focusId: string | null,
   lang: string
 ): [Cell[], string | null] {
@@ -56,6 +63,12 @@ function edit(
       if (!slot) return [cells, focusId]
       const cell = newCell(act.kind, slot.depth, lang)
       return [ops.insert(cells, i, slot, cell), cell.id]
+    }
+    case 'split': {
+      const cut = ops.split(cells, i, act.at, crypto.randomUUID())
+      const slot = ops.insertModes(cut, i)[act.mode]!
+      const cell = newCell(act.kind, slot.depth, lang)
+      return [ops.insert(cut, i, slot, cell), cell.id]
     }
     case 'remove':
       return afterDelete(cells, i, ops.remove(cells, i, newCell('code', 0, lang)))
@@ -84,17 +97,35 @@ function step(s: State, act: Action): State {
       editingId: null,
       selectTo: null,
       defaultLang: act.defaultLang,
-      rev: 0
+      rev: 0,
+      undo: [],
+      redo: []
     }
   if (act.a === 'settings') return { ...s, defaultLang: act.defaultLang }
   if (act.a === 'focus') return { ...s, focusId: act.id }
   if (act.a === 'select') return { ...s, selectTo: act.id }
+  if (act.a === 'undo') {
+    const step = s.undo.at(-1)
+    if (!step) return s
+    const cells = ops.restore(step.before, step.after, s.cells)
+    return { ...s, cells, rev: s.rev + 1, undo: s.undo.slice(0, -1), redo: [...s.redo, step] }
+  }
+  if (act.a === 'redo') {
+    const step = s.redo.at(-1)
+    if (!step) return s
+    const cells = ops.restore(step.after, step.before, s.cells)
+    return { ...s, cells, rev: s.rev + 1, redo: s.redo.slice(0, -1), undo: [...s.undo, step] }
+  }
   if (act.a === 'edit') return { ...s, editingId: act.id }
   const [cells, focusId] = edit(s.cells, act, s.focusId, s.defaultLang)
   if (cells === s.cells) return s
   // A new markdown cell opens raw, ready for typing.
-  const fresh = act.a === 'insert' && act.kind === 'md' ? focusId : s.editingId
-  return { ...s, cells, focusId, editingId: fresh, rev: s.rev + 1 }
+  const made = act.a === 'insert' || act.a === 'split'
+  const fresh = made && act.kind === 'md' ? focusId : s.editingId
+  const next = { ...s, cells, focusId, editingId: fresh, rev: s.rev + 1 }
+  // Text edits belong to the editors' own undo (⌘Z); everything else is a cell action.
+  if (act.a === 'title' || act.a === 'body' || act.a === 'height') return next
+  return { ...next, undo: [...s.undo, { before: s.cells, after: cells }], redo: [] }
 }
 
 // Invariants, enforced after every action:
@@ -107,8 +138,11 @@ export function reducer(s: State, act: Action): State {
   const has = (id: string | null) => !!id && n.cells.some((c) => c.id === id)
   const keepSel = n.focusId === s.focusId || act.a === 'init' ? n.selectTo : null
   const selectTo = keepSel !== n.focusId && has(keepSel) && has(n.focusId) ? keepSel : null
-  const editingId = n.editingId === n.focusId ? n.editingId : null
-  return selectTo === n.selectTo && editingId === n.editingId ? n : { ...n, selectTo, editingId }
+  const focusId = has(n.focusId) ? n.focusId : null
+  const editingId = n.editingId === focusId ? n.editingId : null
+  return selectTo === n.selectTo && editingId === n.editingId && focusId === n.focusId
+    ? n
+    : { ...n, focusId, selectTo, editingId }
 }
 
 // The document store lives outside React so every applied edit reaches main in the same
@@ -119,7 +153,9 @@ let state: State = {
   editingId: null,
   selectTo: null,
   defaultLang: '',
-  rev: 0
+  rev: 0,
+  undo: [],
+  redo: []
 }
 const listeners = new Set<() => void>()
 

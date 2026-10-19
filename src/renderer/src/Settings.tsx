@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Settings } from '../../shared/settings'
+import { SHORTCUTS } from '../../shared/shortcuts'
 import { LANGS, langNamed } from './langs'
 
 type Field = { key: keyof Settings; label: string; type: 'text' | 'number'; list?: string }
@@ -64,6 +65,15 @@ export function SettingsModal({ settings, close }: { settings: Settings; close: 
             />
           </label>
         ))}
+        <div className="settings-title">Keyboard shortcuts</div>
+        <dl className="shortcuts">
+          {SHORTCUTS.map(([keys, action]) => (
+            <Fragment key={keys}>
+              <dt>{keys}</dt>
+              <dd>{action}</dd>
+            </Fragment>
+          ))}
+        </dl>
       </div>
     </div>
   )

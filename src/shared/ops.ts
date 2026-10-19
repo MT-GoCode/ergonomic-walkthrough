@@ -101,6 +101,38 @@ export function outdent(cs: Cells, i: number, j = i): Cells {
   })
 }
 
+// Cuts cell i after its first `at` lines. The rest becomes a continuation cell (same title,
+// language and depth) directly below, which takes over the cell's children, since it now
+// sits right above them; the collapsed state goes with them.
+export function split(cs: Cells, i: number, at: number, restId: string): Cells {
+  const lines = cs[i].body.split('\n')
+  return produce(cs, (draft) => {
+    const top = draft[i]
+    draft.splice(i + 1, 0, { ...top, id: restId, body: lines.slice(at).join('\n') })
+    top.body = lines.slice(0, at).join('\n')
+    top.collapsed = false
+  })
+}
+
+const sameText = (a: Cell, b: Cell): boolean =>
+  a.title === b.title &&
+  a.body === b.body &&
+  (a.kind === 'code' ? a.lang === (b as typeof a).lang : a.height === (b as typeof a).height)
+
+// Undo/redo of a structural action, without losing typing done since: the result has the
+// structure of `target`; a cell's text is target's unless it was edited after the action
+// (`now` differs from `other`, the action's other side), in which case the edit is kept.
+export function restore(target: Cells, other: Cells, now: Cells): Cells {
+  const was = new Map(other.map((c) => [c.id, c]))
+  const current = new Map(now.map((c) => [c.id, c]))
+  return target.map((c) => {
+    const n = current.get(c.id)
+    const o = was.get(c.id)
+    if (!n || !o || sameText(n, o)) return c
+    return { ...n, depth: c.depth, collapsed: c.collapsed }
+  })
+}
+
 export const toggleCollapse = (cs: Cells, i: number): Cells =>
   subtreeEnd(cs, i) > i + 1
     ? produce(cs, (draft) => {

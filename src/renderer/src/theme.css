@@ -207,7 +207,8 @@ body {
 .strip:hover .btns {
   display: flex;
 }
-.strip button {
+.strip button,
+.cutline button {
   font: inherit;
   color: #cccccc;
   background: #1f1f1f;
@@ -215,7 +216,8 @@ body {
   padding: 0 1ch;
   cursor: pointer;
 }
-.strip button:hover:enabled {
+.strip button:hover:enabled,
+.cutline button:hover {
   border-color: #0078d4;
   color: #fff;
 }
@@ -252,6 +254,8 @@ body {
   padding-top: 10vh;
 }
 .settings {
+  max-height: 80vh;
+  overflow: auto;
   background: #252526;
   border: 1px solid var(--border);
   display: grid;
@@ -280,4 +284,35 @@ body {
 }
 .settings input.invalid {
   border-color: #f14c4c;
+}
+.cutline {
+  /* ⌘-hover: a split line across the code, with the insert buttons on it */
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid #0078d4;
+  z-index: 3;
+  pointer-events: none;
+}
+.cutline .btns {
+  display: flex;
+  justify-content: center;
+  gap: 1ch;
+  transform: translateY(-50%);
+}
+.cutline button {
+  pointer-events: auto;
+}
+.shortcuts {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 2ch;
+  margin: 0;
+}
+.shortcuts dt {
+  color: #fff;
+}
+.shortcuts dd {
+  margin: 0;
 }

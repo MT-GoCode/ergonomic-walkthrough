@@ -1,5 +1,5 @@
 #!/bin/bash
-# Mutation check: each mutant must turn its suite red (unit for src/shared, else a rebuild
+# Mutation check: each mutant must turn its suite red (unit for the pure model, else a rebuild
 # + e2e). Runs in a throwaway copy of the working tree, so the checkout is never touched,
 # even if the run is killed. Usage: scripts/mutants.sh
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -11,9 +11,9 @@ ln -s "$root/node_modules" "$work/node_modules"
 cd "$work" || exit 1
 fail=0
 bak=$(mktemp)
-suite() { # unit mutants need only the unit project; renderer mutants need a rebuild + e2e
+suite() { # model mutants need only the unit project; everything else needs a rebuild + e2e
   case $1 in
-    src/shared/*) npx playwright test --project=unit -x --reporter=dot ;;
+    src/shared/ops.ts | src/shared/doc.ts) npx playwright test --project=unit -x --reporter=dot ;;
     *) npx electron-vite build && npx playwright test --project=e2e -x --reporter=dot ;;
   esac
 }
@@ -42,6 +42,8 @@ mutate $O 's/\[A-Za-z\]\[A-Za-z0-9\]\*/[A-Za-z0-9]+/' 'numeric extensions match'
 mutate $O 's/l\.filter\(\(l\) => l\.trim\(\)\)/l.filter(() => true)/; s/lines\.filter\(\(l\) => l\.trim\(\)\)/lines.filter(() => true)/' 'dedent counts blank lines'
 mutate $O 's/if \(subtreeEnd\(out, k\) > end\) draft\[k\]\.collapsed = false/void 0/' 'outdent leaves adopted siblings hidden'
 mutate $O 's/end = Math\.max\(end, subtreeEnd\(cs, k\)\)/end = end/' 'block leaves selected cells children behind'
+mutate $O 's/if \(!n \|\| !o \|\| sameText\(n, o\)\) return c/return c/' 'undo drops typing done since'
+mutate $O 's/body: lines\.slice\(at\)\.join\(.\\n.\)/body: ""/' 'split loses the bottom half'
 mutate $D 's/cells: z\.array\(Cell\)\.min\(1\)/cells: z.array(Cell)/' 'empty doc accepted'
 mutate $D 's/const max = i === 0 \? 0 : cells\[i - 1\]\.depth \+ 1/const max = i === 0 ? 0 : cells[i - 1].depth + 2/' 'depth jump accepted'
 mutate $D 's/ids\.has\(c\.id\)/false/' 'duplicate ids accepted'
@@ -50,15 +52,18 @@ mutate $R/nav.ts 's/cursorLineUp\(v\) \|\| bodyEdge\(v, -1\)/cursorLineUp(v)/' '
 mutate $R/focus.ts "s/a: e\.shiftKey \? 'outdent' : 'indent'/a: e.shiftKey ? 'indent' : 'outdent'/" 'Tab and Shift+Tab swapped'
 mutate $R/focus.ts 's/isMd\(cell\) \? next && focusTitle\(next\) : focusBody/focusBody/' 'down arrow opens markdown raw'
 mutate $R/Cell.tsx 's/, d\.max\)/, Infinity)/' 'resize unclamped'
-mutate $R/CodeBody.tsx 's/crossCellArrows, pasteDedented,/crossCellArrows,/' 'paste not dedented'
-mutate $R/state.ts "s/act\.a === 'insert' && act\.kind === 'md' \? focusId : s\.editingId/s.editingId/" 'new markdown cell not raw'
+mutate $R/CodeBody.tsx 's/      pasteDedented,\n//' 'paste not dedented'
+mutate $R/state.ts "s/const fresh = made && act\.kind === 'md' \? focusId : s\.editingId/const fresh = s.editingId/" 'new markdown cell not raw'
 mutate $R/MdBody.tsx "s/\['Mod-Enter', 'Shift-Enter'\]/['Shift-Enter']/" 'cmd-enter does not render'
 mutate $R/Fenced.tsx 's/if \(support\)\n/if (false)\n/' 'fenced code not highlighted'
 mutate $R/theme.css 's/\.rendered h1 \{\n  font-size: 1\.6em;/.rendered h1 {\n  font-size: 1em;/' 'headings flat'
-mutate $R/state.ts 's/const editingId = n\.editingId === n\.focusId \? n\.editingId : null/const editingId = n.editingId/' 'markdown stays raw when another cell is focused'
+mutate $R/state.ts 's/const editingId = n\.editingId === focusId \? n\.editingId : null/const editingId = n.editingId/' 'markdown stays raw when another cell is focused'
 mutate $R/state.ts 's/const keepSel = n\.focusId === s\.focusId \|\| act\.a === .init. \? n\.selectTo : null/const keepSel = n.selectTo/' 'selection survives focus moving away'
 mutate $R/App.tsx 's/dispatch\(\{ a: e\.shiftKey \? .outdent. : .indent., id: focusId, to: selectTo \}\)/dispatch({ a: e.shiftKey ? "outdent" : "indent", id: focusId })/' 'Tab ignores the selection'
 mutate $R/CodeBody.tsx 's/      wrappedLineIndent,\n//' 'wrapped lines restart at column 0'
+mutate $R/state.ts 's/const cells = ops\.restore\(step\.before, step\.after, s\.cells\)/const cells = s.cells/' 'cell undo does nothing'
+mutate $R/CodeBody.tsx 's/setCut\(e\.metaKey \? cutAt\(e\) : null\)/setCut(null)/' 'split line never shows'
+mutate src/shared/shortcuts.ts "s/  \['⌘W', 'Close window'\],\n//" 'a menu shortcut missing from Settings'
 mutate $R/reveal.ts 's/left < o \|\| right > o \+ sc\.clientWidth \? left : o/o/' 'focus never reveals'
 mutate $R/reveal.ts 's/left < o \|\| right/right/' 'a cell off to the left is not revealed'
 mutate $R/theme.css 's/\.clip \{\n  overflow: clip;/.clip {\n  overflow: visible;/' 'clip layer removed'

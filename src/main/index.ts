@@ -57,7 +57,30 @@ if (primary)
           ]
         },
         ...fileMenu(),
-        { role: 'editMenu' },
+        {
+          label: 'Edit',
+          // ⌘⇧Z / ⌘⇧Y are cell-level history here, so text redo moves to ⌘Y.
+          submenu: [
+            { role: 'undo' },
+            { role: 'redo', accelerator: 'CmdOrCtrl+Y' },
+            { type: 'separator' },
+            ...(['undo', 'redo'] as const).map((op) => ({
+              id: `cell-${op}`,
+              label: op === 'undo' ? 'Undo Cell Action' : 'Redo Cell Action',
+              accelerator: op === 'undo' ? 'CmdOrCtrl+Shift+Z' : 'CmdOrCtrl+Shift+Y',
+              click: (_i: unknown, win: unknown) =>
+                (win as BrowserWindow | undefined)?.webContents.send(CH.command, {
+                  t: 'cellHistory',
+                  op
+                } satisfies Command)
+            })),
+            { type: 'separator' },
+            { role: 'cut' },
+            { role: 'copy' },
+            { role: 'paste' },
+            { role: 'selectAll' }
+          ]
+        },
         { role: 'viewMenu' },
         { role: 'windowMenu' }
       ])

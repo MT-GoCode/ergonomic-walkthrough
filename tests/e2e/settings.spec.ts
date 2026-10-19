@@ -103,3 +103,39 @@ test('a corrupt settings.json is reported and the defaults apply (kills: silent 
   expect(await fits(page, 88)).toBe(true)
   expect(await fits(page, 89)).toBe(false)
 })
+
+test('Settings lists every app-menu shortcut (kills: a menu accelerator missing from the list)', async ({
+  launch
+}) => {
+  const { app, page } = await launch()
+  // Every accelerator in the real menu, in the list's notation (CmdOrCtrl+Shift+S → ⌘⇧S).
+  const accelerators = await app.evaluate(({ Menu }) => {
+    const out: string[] = []
+    const walk = (items: Electron.MenuItem[]) =>
+      items.forEach((i) => {
+        if (i.accelerator) out.push(i.accelerator)
+        if (i.submenu) walk(i.submenu.items)
+      })
+    walk(Menu.getApplicationMenu()!.items)
+    return out
+  })
+  const mods: Record<string, string> = {
+    Control: '⌃',
+    Alt: '⌥',
+    Shift: '⇧',
+    Command: '⌘',
+    CmdOrCtrl: '⌘',
+    CommandOrControl: '⌘'
+  }
+  const order = '⌃⌥⇧⌘'
+  const symbols = accelerators.map((a) => {
+    const parts = a.split(/\+(?=.)/)
+    const key = parts.pop()!.replace('Plus', '+')
+    const m = parts.map((p) => mods[p]).sort((x, y) => order.indexOf(x) - order.indexOf(y))
+    return m.join('') + key
+  })
+  expect(symbols.length).toBeGreaterThan(8)
+  await openSettings(app, page)
+  const listed = (await page.locator('.shortcuts dt').allTextContents()).join(' ')
+  for (const s of symbols) expect(listed, s).toContain(s)
+})

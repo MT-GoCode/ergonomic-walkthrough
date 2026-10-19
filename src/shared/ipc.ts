@@ -18,6 +18,7 @@ export type Command =
   | { t: 'settings'; s: Settings }
   | { t: 'openSettings' }
   | { t: 'flush'; n: number }
+  | { t: 'cellHistory'; op: 'undo' | 'redo' }
 
 // renderer → main; the only surface the renderer sees.
 export interface Api {
