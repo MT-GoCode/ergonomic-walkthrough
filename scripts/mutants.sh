@@ -53,6 +53,8 @@ mutate $R/CodeBody.tsx 's/crossCellArrows, pasteDedented,/crossCellArrows,/' 'pa
 mutate $R/state.ts "s/act\.a === 'insert' && act\.kind === 'md' \? focusId : s\.editingId/s.editingId/" 'new markdown cell not raw'
 mutate $R/state.ts 's/return next\.editingId && next\.editingId !== next\.focusId \? \{ \.\.\.next, editingId: null \} : next/return next/' 'markdown stays raw when another cell is focused'
 mutate $R/MdBody.tsx "s/\['Mod-Enter', 'Shift-Enter'\]/['Shift-Enter']/" 'cmd-enter does not render'
+mutate $R/Fenced.tsx 's/if \(support\)\n/if (false)\n/' 'fenced code not highlighted'
+mutate $R/theme.css 's/\.rendered h1 \{\n  font-size: 1\.6em;/.rendered h1 {\n  font-size: 1em;/' 'headings flat'
 mutate $R/reveal.ts 's/left < o \|\| right > o \+ sc\.clientWidth \? left : o/o/' 'focus never reveals'
 mutate $R/reveal.ts 's/left < o \|\| right/right/' 'a cell off to the left is not revealed'
 mutate $R/theme.css 's/\.clip \{\n  overflow: clip;/.clip {\n  overflow: visible;/' 'clip layer removed'

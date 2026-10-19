@@ -140,3 +140,50 @@ test('raw markdown survives leaving the window; it renders when another cell tak
   await expect.poll(raw).toBe(0)
   await expect(md.locator('.title')).toBeFocused()
 })
+
+test('rendered markdown: headings are sized, code blocks are one block highlighted like code cells (kills: plain fences / flat headings)', async ({
+  launch
+}, info) => {
+  const { page } = await launch()
+  // A code cell holding `def f` gives the reference colour for the keyword.
+  await page.locator('.cm-content').first().click()
+  await page.keyboard.insertText('def f(): pass')
+  const strip = page.locator('.cell > .strip').first()
+  await expect(async () => {
+    await strip.hover()
+    await strip.getByRole('button', { name: '+ MD', exact: true }).click({ timeout: 1000 })
+  }).toPass()
+  await page.keyboard.insertText(
+    '# Crash course on Pytests\n\nA test is just a function:\n\n```python\ndef test_add():\n    assert 1 + 1 == 2\n```\n\n```nosuchlang\ndef x\n```'
+  )
+  await page.keyboard.press('Shift+Enter')
+  const md = page.locator('.cell.md .rendered')
+  await expect(md.locator('h1')).toHaveText('Crash course on Pytests')
+  const px = (sel: string) =>
+    md
+      .locator(sel)
+      .first()
+      .evaluate((e) => parseFloat(getComputedStyle(e).fontSize))
+  expect(await px('h1')).toBeGreaterThan(1.4 * (await px('p')))
+  const colour = (loc: ReturnType<typeof page.locator>) =>
+    loc.evaluate((e) => getComputedStyle(e).color)
+  const cellDef = page.locator('.cell.code .cm-line span', { hasText: /^def$/ }).first()
+  const fenceDef = md.locator('pre').first().locator('span', { hasText: /^def$/ })
+  await expect(fenceDef).toHaveCount(1)
+  expect(await colour(fenceDef)).toBe(await colour(cellDef))
+  // One block: the <pre> is black, its <code> paints nothing per line.
+  expect(
+    await md
+      .locator('pre')
+      .first()
+      .evaluate((e) => getComputedStyle(e).backgroundColor)
+  ).toBe('rgb(0, 0, 0)')
+  expect(
+    await md
+      .locator('pre code')
+      .first()
+      .evaluate((e) => getComputedStyle(e).backgroundColor)
+  ).toBe('rgba(0, 0, 0, 0)')
+  expect(await md.locator('pre').nth(1).locator('span').count()).toBe(0)
+  await page.screenshot({ path: info.outputPath('markdown.png') })
+})

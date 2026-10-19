@@ -7,6 +7,7 @@ import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Cell } from '../../shared/doc'
 import { mdTheme, setup } from './editor'
+import { Fenced } from './Fenced'
 import { cellOf, focusTitle } from './focus'
 import { crossCellArrows } from './nav'
 import { dispatch } from './state'
@@ -63,7 +64,9 @@ export function MdBody({
           onDoubleClick={() => dispatch({ a: 'edit', id })}
           onKeyDown={(e) => e.key === 'Enter' && dispatch({ a: 'edit', id })}
         >
-          <Markdown remarkPlugins={[remarkGfm]}>{cell.body}</Markdown>
+          <Markdown remarkPlugins={[remarkGfm]} components={{ pre: Fenced }}>
+            {cell.body}
+          </Markdown>
         </div>
       )}
     </div>
