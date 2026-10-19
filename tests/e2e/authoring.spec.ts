@@ -47,7 +47,7 @@ test('mouse only: the mockup trace is built in reading order, out of the dive vi
   await insertBelow(page, 'main.js:12', '+ MD')
   await expect(page.locator('.cell.md .cm-content')).toBeFocused()
   await page.keyboard.type('why we dive')
-  await page.keyboard.press('Escape')
+  await page.keyboard.press('Shift+Enter')
   await page.keyboard.type('entrypoint discussion')
   await insertBelow(page, 'entrypoint discussion', '+ Code')
   await page.keyboard.type('main.js:50')

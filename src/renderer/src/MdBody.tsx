@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import CodeMirror, { EditorView, keymap } from '@uiw/react-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
+import { Prec } from '@codemirror/state'
 import { languages } from '@codemirror/language-data'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -24,8 +25,20 @@ export function MdBody({
       EditorView.lineWrapping,
       markdown({ codeLanguages: languages }),
       crossCellArrows,
-      // Esc returns to the title; the blur that follows leaves raw mode.
-      keymap.of([{ key: 'Escape', run: (v) => (focusTitle(cellOf(v.dom)), true) }])
+      // ⌘↩ / ⇧↩ render and leave the cursor on this cell's title (Jupyter-style).
+      // High precedence: CodeMirror's default keymap binds Enter (with shift) and Mod-Enter.
+      Prec.high(
+        keymap.of(
+          ['Mod-Enter', 'Shift-Enter'].map((key) => ({
+            key,
+            run: (v: EditorView) => {
+              focusTitle(cellOf(v.dom))
+              dispatch({ a: 'edit', id: null })
+              return true
+            }
+          }))
+        )
+      )
     ],
     []
   )
@@ -41,9 +54,6 @@ export function MdBody({
           basicSetup={setup}
           extensions={extensions}
           onChange={onChange}
-          onBlur={(e) =>
-            e.currentTarget.contains(e.relatedTarget) || dispatch({ a: 'edit', id: null })
-          }
         />
       ) : (
         // Focusable so a single click selects the cell (and text) without entering raw mode.

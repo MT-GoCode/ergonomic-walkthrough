@@ -66,7 +66,7 @@ function edit(
   }
 }
 
-export function reducer(s: State, act: Action): State {
+function step(s: State, act: Action): State {
   if (act.a === 'init')
     return {
       cells: act.cells,
@@ -83,6 +83,13 @@ export function reducer(s: State, act: Action): State {
   // A new markdown cell opens raw, ready for typing.
   const fresh = act.a === 'insert' && act.kind === 'md' ? focusId : s.editingId
   return { ...s, cells, focusId, editingId: fresh, rev: s.rev + 1 }
+}
+
+// A markdown cell is raw only while it is the focused cell: focus moving to any other cell
+// renders it, while leaving the window (which keeps focusId) does not.
+export function reducer(s: State, act: Action): State {
+  const next = step(s, act)
+  return next.editingId && next.editingId !== next.focusId ? { ...next, editingId: null } : next
 }
 
 // The document store lives outside React so every applied edit reaches main in the same

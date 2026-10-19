@@ -99,7 +99,7 @@ test('clicking a guide folds exactly its subtree and the placeholder counts it (
   await expect(page.locator('.cell')).toHaveCount(fixture.length)
 })
 
-test('markdown: click focuses but stays rendered; double click or Enter edits raw; Esc renders (kills: click → edit)', async ({
+test('markdown: click focuses but stays rendered; double click or Enter edits raw; ⇧↩ renders (kills: click → edit)', async ({
   launch
 }) => {
   const { page } = await launch([FIXTURE])
@@ -111,9 +111,32 @@ test('markdown: click focuses but stays rendered; double click or Enter edits ra
   await expect(md.locator('.cm-editor')).toBeVisible()
   await page.keyboard.press('End')
   await page.keyboard.type(' **bold**')
-  await page.keyboard.press('Escape')
+  await page.keyboard.press('Shift+Enter')
   await expect(md.locator('.rendered strong')).toHaveText('bold')
   await md.locator('.rendered').click()
   await page.keyboard.press('Enter')
   await expect(md.locator('.cm-editor')).toBeVisible()
+})
+
+test('raw markdown survives leaving the window; it renders when another cell takes focus or on ⌘↩ (kills: blur renders / exit ignored)', async ({
+  launch
+}) => {
+  const { app, page } = await launch([FIXTURE])
+  const md = page.locator('.cell.md').first()
+  const raw = () => md.locator('.cm-editor').count()
+  await md.locator('.rendered').dblclick()
+  await expect(md.locator('.cm-editor')).toBeVisible()
+  // Leaving the window: the editor loses DOM focus and the window blurs, but no cell gains it.
+  await page.evaluate(() => (document.activeElement as HTMLElement).blur())
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].blur())
+  await page.waitForTimeout(200)
+  expect(await raw()).toBe(1)
+  await md.locator('.cm-content').click()
+  await page.locator('.cell.code .cm-content').first().click()
+  await expect.poll(raw).toBe(0)
+  await md.locator('.rendered').dblclick()
+  await expect(md.locator('.cm-editor')).toBeVisible()
+  await page.keyboard.press('Meta+Enter')
+  await expect.poll(raw).toBe(0)
+  await expect(md.locator('.title')).toBeFocused()
 })

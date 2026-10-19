@@ -51,6 +51,8 @@ mutate $R/focus.ts 's/isMd\(cell\) \? next && focusTitle\(next\) : focusBody/foc
 mutate $R/Cell.tsx 's/, d\.max\)/, Infinity)/' 'resize unclamped'
 mutate $R/CodeBody.tsx 's/crossCellArrows, pasteDedented,/crossCellArrows,/' 'paste not dedented'
 mutate $R/state.ts "s/act\.a === 'insert' && act\.kind === 'md' \? focusId : s\.editingId/s.editingId/" 'new markdown cell not raw'
+mutate $R/state.ts 's/return next\.editingId && next\.editingId !== next\.focusId \? \{ \.\.\.next, editingId: null \} : next/return next/' 'markdown stays raw when another cell is focused'
+mutate $R/MdBody.tsx "s/\['Mod-Enter', 'Shift-Enter'\]/['Shift-Enter']/" 'cmd-enter does not render'
 mutate $R/reveal.ts 's/left < o \|\| right > o \+ sc\.clientWidth \? left : o/o/' 'focus never reveals'
 mutate $R/reveal.ts 's/left < o \|\| right/right/' 'a cell off to the left is not revealed'
 mutate $R/theme.css 's/\.clip \{\n  overflow: clip;/.clip {\n  overflow: visible;/' 'clip layer removed'
