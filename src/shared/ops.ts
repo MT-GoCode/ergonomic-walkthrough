@@ -51,11 +51,6 @@ export const insert = (cs: Cells, i: number, slot: Slot, cell: Cell): Cells =>
     draft.splice(slot.index, 0, { ...cell, depth: slot.depth })
   })
 
-const shift = (cs: Cells, i: number, by: number): Cells =>
-  produce(cs, (draft) => {
-    for (let j = i; j < subtreeEnd(cs, i); j++) draft[j].depth += by
-  })
-
 // Children are promoted one level so nothing vanishes with their parent.
 export function remove(cs: Cells, i: number, blank: Cell): Cells {
   const end = subtreeEnd(cs, i)
@@ -71,22 +66,38 @@ export function removeWithIndented(cs: Cells, i: number, blank: Cell): Cells {
   return out.length ? out : [blank]
 }
 
-// Becomes the last child of its previous sibling (org-mode demote).
-export function indent(cs: Cells, i: number): Cells {
+// A range [i, j] moves as one block: its cells plus the indented children of any of them,
+// so their nesting relative to each other never changes. A single cell is the range [i, i].
+function blockEnd(cs: Cells, i: number, j: number): number {
+  let end = j + 1
+  for (let k = i; k <= j; k++) end = Math.max(end, subtreeEnd(cs, k))
+  return end
+}
+
+const shiftBlock = (cs: Cells, i: number, end: number, by: number): Cells =>
+  produce(cs, (draft) => {
+    for (let k = i; k < end; k++) draft[k].depth += by
+  })
+
+// The block becomes the last child of its first cell's previous sibling (org-mode demote).
+export function indent(cs: Cells, i: number, j = i): Cells {
   const d = cs[i].depth
   if (i === 0 || cs[i - 1].depth < d) return cs
   let p = i - 1
   while (cs[p].depth !== d) p--
-  return produce(shift(cs, i, 1), (draft) => {
+  return produce(shiftBlock(cs, i, blockEnd(cs, i, j), 1), (draft) => {
     draft[p].collapsed = false
   })
 }
 
-// Following siblings become its children, so nothing moves on screen (org-mode promote).
-export function outdent(cs: Cells, i: number): Cells {
-  if (cs[i].depth === 0) return cs
-  return produce(shift(cs, i, -1), (draft) => {
-    draft[i].collapsed = false // adopted siblings must not vanish
+// Following siblings become children of the block, so nothing moves on screen (org-mode
+// promote). Any cell in the block that adopts them is opened, so nothing vanishes either.
+export function outdent(cs: Cells, i: number, j = i): Cells {
+  const end = blockEnd(cs, i, j)
+  if (cs.slice(i, end).some((c) => c.depth === 0)) return cs
+  const out = shiftBlock(cs, i, end, -1)
+  return produce(out, (draft) => {
+    for (let k = i; k < end; k++) if (subtreeEnd(out, k) > end) draft[k].collapsed = false
   })
 }
 

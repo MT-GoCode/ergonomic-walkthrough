@@ -187,3 +187,39 @@ test('rendered markdown: headings are sized, code blocks are one block highlight
   expect(await md.locator('pre').nth(1).locator('span').count()).toBe(0)
   await page.screenshot({ path: info.outputPath('markdown.png') })
 })
+
+test('a wrapped line continues under its own indentation, a little further in (kills: wrapped lines restart at column 0)', async ({
+  launch
+}) => {
+  const { page } = await launch()
+  await page.locator('.cm-content').first().click()
+  await page.keyboard.insertText('    ' + 'word '.repeat(40))
+  const rects = await page
+    .locator('.cm-line')
+    .first()
+    .evaluate((line) => {
+      const range = document.createRange()
+      range.selectNodeContents(line)
+      const boxes = [...range.getClientRects()].filter((r) => r.width > 0)
+      // The first non-space character (offset 4), across the highlighter's text nodes.
+      const walk = document.createTreeWalker(line, NodeFilter.SHOW_TEXT)
+      let node = walk.nextNode() as Text
+      let at = 4
+      while (at >= node.length) {
+        at -= node.length
+        node = walk.nextNode() as Text
+      }
+      const first = document.createRange()
+      first.setStart(node, at)
+      first.setEnd(node, at + 1)
+      // Where the second visual line starts: the leftmost box below the first one.
+      const below = boxes.filter((b) => b.top > boxes[0].top + 1)
+      return {
+        lines: below.length,
+        secondLeft: Math.min(...below.map((b) => b.left)),
+        textLeft: first.getBoundingClientRect().left
+      }
+    })
+  expect(rects.lines).toBeGreaterThan(0)
+  expect(rects.secondLeft).toBeGreaterThan(rects.textLeft)
+})

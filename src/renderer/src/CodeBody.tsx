@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import CodeMirror, { EditorView } from '@uiw/react-codemirror'
+import { wrappedLineIndent } from 'codemirror-wrapped-line-indent'
 import { languages } from '@codemirror/language-data'
 import type { Cell } from '../../shared/doc'
 import { dedent } from '../../shared/ops'
@@ -16,7 +17,13 @@ export function CodeBody({ cell }: { cell: Extract<Cell, { kind: 'code' }> }) {
     [cell.id]
   )
   const extensions = useMemo(
-    () => [EditorView.lineWrapping, crossCellArrows, pasteDedented, ...(support ? [support] : [])],
+    () => [
+      EditorView.lineWrapping,
+      wrappedLineIndent,
+      crossCellArrows,
+      pasteDedented,
+      ...(support ? [support] : [])
+    ],
     [support]
   )
   return (

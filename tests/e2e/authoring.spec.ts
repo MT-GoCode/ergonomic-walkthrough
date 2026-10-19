@@ -200,3 +200,38 @@ test('⋯ → Delete with indented below removes exactly that subtree (kills: po
     await page.$$eval('.cell .title', (t) => t.map((e) => (e as HTMLInputElement).value))
   ).not.toContain('__init__.py:131 SUPPORTED_TASKS')
 })
+
+test('shift-click selects the range in document order; Tab / Shift+Tab move it as one; Esc ends it (kills: range ignored)', async ({
+  launch
+}) => {
+  const { app, page } = await launch([FIXTURE])
+  const last = await recordPushes(app)
+  const depths = async () => parseDoc((await last())!).cells.map((c) => c.depth)
+  await (await cellTitled(page, '__init__.py:743 resolve task')).locator('.title').click()
+  await (
+    await cellTitled(page, '__init__.py:749 default model')
+  )
+    .locator('.title')
+    .click({ modifiers: ['Shift'] })
+  // 743, its two indented children, the LESSON 4 note and 749.
+  await expect(page.locator('.cell.selected')).toHaveCount(5)
+  await page.keyboard.press('Tab')
+  const base = [0, 0, 1, 1, 2, 2, 1, 1, 1]
+  await expect.poll(async () => (await depths()).slice(0, 9)).toEqual([0, 0, 1, 2, 3, 3, 2, 2, 1])
+  await page.keyboard.press('Shift+Tab')
+  await expect.poll(async () => (await depths()).slice(0, 9)).toEqual(base)
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.cell.selected')).toHaveCount(0)
+  await page.keyboard.press('Tab')
+  // Only the focused cell moves now, carrying its own children.
+  await expect.poll(async () => (await depths()).slice(0, 9)).toEqual([0, 0, 1, 2, 3, 3, 1, 1, 1])
+  // Moving focus to another cell by keyboard also ends a selection.
+  await (
+    await cellTitled(page, '__init__.py:749 default model')
+  )
+    .locator('.title')
+    .click({ modifiers: ['Shift'] })
+  await expect(page.locator('.cell.selected')).not.toHaveCount(0)
+  await page.keyboard.press('ArrowUp')
+  await expect(page.locator('.cell.selected')).toHaveCount(0)
+})

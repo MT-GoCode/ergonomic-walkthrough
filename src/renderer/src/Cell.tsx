@@ -6,9 +6,23 @@ import { titleKey } from './focus'
 import { MdBody } from './MdBody'
 import { dispatch } from './state'
 
-type Props = { cell: Cell; focused: boolean; editing: boolean; canIn: boolean; canOut: boolean }
+type Props = {
+  cell: Cell
+  focused: boolean
+  editing: boolean
+  selected: boolean
+  canIn: boolean
+  canOut: boolean
+}
 
-export const CellView = memo(function CellView({ cell, focused, editing, canIn, canOut }: Props) {
+export const CellView = memo(function CellView({
+  cell,
+  focused,
+  editing,
+  selected,
+  canIn,
+  canOut
+}: Props) {
   const id = cell.id
   const title = useRef<HTMLInputElement>(null)
   const root = useRef<HTMLDivElement>(null)
@@ -22,9 +36,17 @@ export const CellView = memo(function CellView({ cell, focused, editing, canIn, 
   return (
     <div
       ref={root}
-      className={`cell ${cell.kind}${focused ? ' focused' : ''}`}
+      className={`cell ${cell.kind}${focused ? ' focused' : ''}${selected ? ' selected' : ''}`}
       data-id={id}
       onFocus={() => focused || dispatch({ a: 'focus', id })}
+      // Shift-click on another cell selects the range from the focused cell to it, keeping
+      // keyboard focus where it is; any plain click ends a selection.
+      onMouseDown={(e) => {
+        if (!e.shiftKey) return dispatch({ a: 'select', id: null })
+        if (focused || !document.activeElement?.closest('.cell')) return
+        e.preventDefault()
+        dispatch({ a: 'select', id })
+      }}
     >
       <div className="titlebar">
         <input

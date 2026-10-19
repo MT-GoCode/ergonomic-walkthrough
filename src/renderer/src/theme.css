@@ -35,6 +35,9 @@ body {
   box-sizing: border-box;
   background: #000;
 }
+.cell.selected .titlebar {
+  background: #094771; /* VS Code list selection */
+}
 .cell.focused {
   border-color: #0078d4;
   z-index: 1;

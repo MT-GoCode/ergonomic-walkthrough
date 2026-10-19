@@ -91,6 +91,25 @@ test.describe('ops', () => {
       'c1 D'
     ])
   })
+  test('a selected range indents as one block, children of selected cells included (kills: block end)', () => {
+    expect(shape(ops.indent(mk('c0 A', 'c1 B', 'c0 C', 'c0 D', 'c1 E', 'c0 F'), 2, 3))).toEqual([
+      'c0 A',
+      'c1 B',
+      'c1 C',
+      'c1 D',
+      'c2 E',
+      'c0 F'
+    ])
+  })
+  test('a selected range outdents as one block; the next sibling is adopted, never hidden (kills: range expand)', () => {
+    const cs = ops.outdent(mk('c0 A', 'c1 B', 'c1 D+', 'c2 X', 'c1 F'), 1, 2)
+    expect(shape(cs)).toEqual(['c0 A', 'c0 B', 'c0 D', 'c1 X', 'c1 F'])
+    expect(ops.visible(cs)).toEqual([0, 1, 2, 3, 4])
+  })
+  test('a range reaching the outer level cannot outdent (kills: depth-0 guard)', () => {
+    const cs = mk('c0 A', 'c1 B', 'c0 C')
+    expect(ops.outdent(cs, 1, 2)).toBe(cs)
+  })
   test('outdenting a collapsed cell opens it so adopted siblings stay visible (kills: outdent expand removed)', () => {
     const cs = ops.outdent(mk('c0 A', 'c1 B+', 'c2 C', 'c1 D'), 1)
     expect(shape(cs)).toEqual(['c0 A', 'c0 B', 'c1 C', 'c1 D'])
@@ -152,7 +171,12 @@ test('10k random ops keep the invariant, never adopt, never move survivors', () 
     const vis = ops.visible(cs)
     const i = pick(vis)
     const before = cs
-    const end = ops.subtreeEnd(cs, i)
+    // Range ops act on [i, j]; the block they move runs to the first later cell no deeper
+    // than the shallowest selected one (derived here independently of ops.ts).
+    const j = Math.min(cs.length - 1, i + Math.floor(r() * 4))
+    const m = Math.min(...cs.slice(i, j + 1).map((c) => c.depth))
+    let end = j + 1
+    while (end < cs.length && cs[end].depth > m) end++
     const kind = pick(['code', 'md'] as const)
     const op = pick([
       'insert',
@@ -173,16 +197,24 @@ test('10k random ops keep the invariant, never adopt, never move survivors', () 
     } else if (op === 'remove') cs = ops.remove(cs, i, { ...blank(), id: `n${n++}` })
     else if (op === 'removeWithIndented')
       cs = ops.removeWithIndented(cs, i, { ...blank(), id: `n${n++}` })
-    else if (op === 'indent') cs = ops.indent(cs, i)
-    else if (op === 'outdent') cs = ops.outdent(cs, i)
+    else if (op === 'indent') cs = ops.indent(cs, i, j)
+    else if (op === 'outdent') cs = ops.outdent(cs, i, j)
     else cs = ops.toggleCollapse(cs, i)
 
-    const ctx = `step ${step} ${op} at ${i}`
+    const ctx = `step ${step} ${op} at ${i}..${j}`
     expect(Doc.safeParse({ format: 'walkthrough', version: 1, cells: cs }).success, ctx).toBe(true)
     const old = new Map(before.map((c) => [c.id, c]))
     const survivors = cs.filter((c) => old.has(c.id)).map((c) => c.id)
     expect(survivors, ctx).toEqual(before.map((c) => c.id).filter((id) => survivors.includes(id)))
-    const target = new Set(before.slice(i, end).map((c) => c.id))
+    const ranged = op === 'indent' || op === 'outdent'
+    const target = new Set(
+      before.slice(i, ranged ? end : ops.subtreeEnd(before, i)).map((c) => c.id)
+    )
+    if (ranged && cs !== before)
+      // The block moved as one: every cell in it shifted by the same amount.
+      expect(new Set(before.slice(i, end).map((c, k) => cs[i + k].depth - c.depth)).size, ctx).toBe(
+        1
+      )
     for (const c of cs)
       if (old.has(c.id) && !target.has(c.id))
         expect(c.depth, `${ctx} moved ${c.id}`).toBe(old.get(c.id)!.depth)

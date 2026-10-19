@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import CodeMirror, { EditorView, keymap } from '@uiw/react-codemirror'
+import { wrappedLineIndent } from 'codemirror-wrapped-line-indent'
 import { markdown } from '@codemirror/lang-markdown'
 import { Prec } from '@codemirror/state'
 import { languages } from '@codemirror/language-data'
@@ -24,6 +25,7 @@ export function MdBody({
   const extensions = useMemo(
     () => [
       EditorView.lineWrapping,
+      wrappedLineIndent,
       markdown({ codeLanguages: languages }),
       crossCellArrows,
       // ⌘↩ / ⇧↩ render and leave the cursor on this cell's title (Jupyter-style).

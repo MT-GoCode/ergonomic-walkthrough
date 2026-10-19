@@ -16,6 +16,20 @@ export function App() {
       setSettings(settings)
       dispatch({ a: 'init', cells: doc.cells, defaultLang: settings.defaultLang })
     })
+    // With a selection, Tab / Shift+Tab move the whole range and Esc ends it, wherever the
+    // keyboard focus is (title or body); captured before any cell sees the key.
+    window.addEventListener(
+      'keydown',
+      (e) => {
+        const { focusId, selectTo } = store.get()
+        if (!focusId || !selectTo || (e.key !== 'Tab' && e.key !== 'Escape')) return
+        e.preventDefault()
+        e.stopPropagation()
+        if (e.key === 'Escape') return dispatch({ a: 'select', id: null })
+        dispatch({ a: e.shiftKey ? 'outdent' : 'indent', id: focusId, to: selectTo })
+      },
+      true
+    )
     window.api.onCommand((c: Command) => {
       switch (c.t) {
         case 'cellMenu':
@@ -47,7 +61,13 @@ export function App() {
   if (!settings) return null
   return (
     <>
-      <Canvas cells={s.cells} focusId={s.focusId} editingId={s.editingId} settings={settings} />
+      <Canvas
+        cells={s.cells}
+        focusId={s.focusId}
+        editingId={s.editingId}
+        selectTo={s.selectTo}
+        settings={settings}
+      />
       {settingsOpen && <SettingsModal settings={settings} close={() => setSettingsOpen(false)} />}
     </>
   )

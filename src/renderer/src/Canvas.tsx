@@ -5,15 +5,18 @@ import { CellView } from './Cell'
 import type { Settings } from '../../shared/settings'
 import { dispatch, type State } from './state'
 
-type Props = Pick<State, 'cells' | 'focusId' | 'editingId'> & { settings: Settings }
+type Props = Pick<State, 'cells' | 'focusId' | 'editingId' | 'selectTo'> & { settings: Settings }
 
-export function Canvas({ cells, focusId, editingId, settings }: Props) {
+export function Canvas({ cells, focusId, editingId, selectTo, settings }: Props) {
   const scroller = useRef<HTMLDivElement>(null)
   const track = useRef<HTMLDivElement>(null)
   // Anything that changes cell geometry re-checks the focused cell.
   const layout = useMemo(() => [cells, settings, editingId], [cells, settings, editingId])
   const offset = useReveal(scroller, track, layout)
   // Flat list → nested groups: each cell is followed by its subtree in a guide column.
+  // The selection is every cell between the focused one and selectTo, in document order.
+  const ends = [focusId, selectTo].map((id) => cells.findIndex((c) => c.id === id))
+  const [lo, hi] = selectTo ? [Math.min(...ends), Math.max(...ends)] : [-1, -1]
   const range = (from: number, to: number): ReactNode[] => {
     const out: ReactNode[] = []
     for (let i = from; i < to;) {
@@ -26,6 +29,7 @@ export function Canvas({ cells, focusId, editingId, settings }: Props) {
           cell={c}
           focused={c.id === focusId}
           editing={c.id === editingId}
+          selected={i >= lo && i <= hi}
           canIn={!!modes.in}
           canOut={!!modes.out}
         />
