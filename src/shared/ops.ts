@@ -26,6 +26,17 @@ export function visible(cs: Cells): number[] {
   return out
 }
 
+// The ids of the collapsed cells that hide cell i.
+export function collapsedAbove(cs: Cells, i: number): string[] {
+  const out: string[] = []
+  for (let j = i - 1, d = cs[i].depth; j >= 0 && d > 0; j--)
+    if (cs[j].depth < d) {
+      d = cs[j].depth
+      if (cs[j].collapsed) out.push(cs[j].id)
+    }
+  return out
+}
+
 export type Mode = 'same' | 'in' | 'out'
 export type Slot = { index: number; depth: number }
 

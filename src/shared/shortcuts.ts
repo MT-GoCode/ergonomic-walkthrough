@@ -15,6 +15,7 @@ export const SHORTCUTS: [keys: string, action: string][] = [
   ['⋯ on a title bar', 'Delete / delete with indented below'],
   ['⌘Z / ⌘Y', 'Undo / redo text'],
   ['⇧⌘Z / ⇧⌘Y', 'Undo / redo a cell action (insert, delete, indent, collapse, split)'],
+  ['⇧⌘F', 'Find in every cell, collapsed ones too: ↩ / ⇧↩ next / previous, Esc to the match'],
   ['⌘N', 'New window'],
   ['⌘O', 'Open…'],
   ['⌘S / ⇧⌘S', 'Save / Save As…'],

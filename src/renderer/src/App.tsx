@@ -2,6 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { Command } from '../../shared/ipc'
 import type { Settings } from '../../shared/settings'
 import { Canvas } from './Canvas'
+import { Find } from './Find'
 import { SettingsModal } from './Settings'
 import { dispatch, store } from './state'
 
@@ -10,6 +11,8 @@ export function App() {
   // The last settings main broadcast; main is their only writer.
   const [settings, setSettings] = useState<Settings | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // Bumped by each ⇧⌘F, which opens the find bar or re-selects its query.
+  const [findAsk, setFindAsk] = useState(0)
 
   useEffect(() => {
     window.api.init().then(({ doc, settings }) => {
@@ -41,6 +44,8 @@ export function App() {
           return setSettingsOpen(true)
         case 'cellHistory':
           return dispatch({ a: c.op })
+        case 'find':
+          return setFindAsk((n) => n + 1)
         case 'flush':
           // Edits are pushed as they are applied, but a keystroke sent just before the flush
           // may still be in Chromium's input pipeline, which IPC can overtake. Input that was
@@ -68,8 +73,10 @@ export function App() {
         focusId={s.focusId}
         editingId={s.editingId}
         selectTo={s.selectTo}
+        peek={s.peek}
         settings={settings}
       />
+      {findAsk > 0 && <Find ask={findAsk} cells={s.cells} close={() => setFindAsk(0)} />}
       {settingsOpen && <SettingsModal settings={settings} close={() => setSettingsOpen(false)} />}
     </>
   )

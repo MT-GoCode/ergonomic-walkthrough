@@ -75,6 +75,16 @@ if (primary)
                 } satisfies Command)
             })),
             { type: 'separator' },
+            {
+              id: 'find',
+              label: 'Find…',
+              accelerator: 'CmdOrCtrl+Shift+F',
+              click: (_i: unknown, win: unknown) =>
+                (win as BrowserWindow | undefined)?.webContents.send(CH.command, {
+                  t: 'find'
+                } satisfies Command)
+            },
+            { type: 'separator' },
             { role: 'cut' },
             { role: 'copy' },
             { role: 'paste' },

@@ -5,13 +5,18 @@ import { CellView } from './Cell'
 import type { Settings } from '../../shared/settings'
 import { dispatch, type State } from './state'
 
-type Props = Pick<State, 'cells' | 'focusId' | 'editingId' | 'selectTo'> & { settings: Settings }
+type Props = Pick<State, 'cells' | 'focusId' | 'editingId' | 'selectTo' | 'peek'> & {
+  settings: Settings
+}
 
-export function Canvas({ cells, focusId, editingId, selectTo, settings }: Props) {
+export function Canvas({ cells, focusId, editingId, selectTo, peek, settings }: Props) {
   const scroller = useRef<HTMLDivElement>(null)
   const track = useRef<HTMLDivElement>(null)
   // Anything that changes cell geometry re-checks the focused cell.
-  const layout = useMemo(() => [cells, settings, editingId], [cells, settings, editingId])
+  const layout = useMemo(
+    () => [cells, settings, editingId, peek],
+    [cells, settings, editingId, peek]
+  )
   const offset = useReveal(scroller, track, layout)
   // Flat list → nested groups: each cell is followed by its subtree in a guide column.
   // The selection is every cell between the focused one and selectTo, in document order.
@@ -39,7 +44,7 @@ export function Canvas({ cells, focusId, editingId, selectTo, settings }: Props)
           <div className="group" key={c.id + '/kids'}>
             <div className="guide" onClick={() => dispatch({ a: 'toggle', id: c.id })} />
             <div className="kids">
-              {c.collapsed ? (
+              {c.collapsed && !peek.includes(c.id) ? (
                 <div className="folded" onClick={() => dispatch({ a: 'toggle', id: c.id })}>
                   ▸ {end - i - 1} cells
                 </div>

@@ -27,9 +27,11 @@ export const CellView = memo(function CellView({
   const title = useRef<HTMLInputElement>(null)
   const root = useRef<HTMLDivElement>(null)
   // Keyboard focus follows the focused cell when it becomes focused from outside it: a new
-  // cell, one remounted by Tab/Shift+Tab, or the neighbour of a deleted cell.
+  // cell, one remounted by Tab/Shift+Tab, or the neighbour of a deleted cell. The find bar
+  // keeps the keyboard while it walks focus through matches.
   useEffect(() => {
-    if (focused && !editing && !root.current!.contains(document.activeElement))
+    const find = document.activeElement?.closest('.find')
+    if (focused && !editing && !find && !root.current!.contains(document.activeElement))
       title.current!.focus()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focused])

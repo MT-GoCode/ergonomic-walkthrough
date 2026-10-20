@@ -316,3 +316,33 @@ body {
 .shortcuts dd {
   margin: 0;
 }
+/* VS Code's find widget: top right, over the canvas. */
+.find {
+  position: fixed;
+  top: 0;
+  right: 16px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 1ch;
+  padding: 4px;
+  background: #252526;
+  border: 1px solid #454545;
+  box-shadow: 0 2px 8px #000;
+}
+.find input {
+  width: 30ch;
+  background: #3c3c3c;
+  color: #cccccc;
+  border: 1px solid #3c3c3c;
+  font: inherit;
+  padding: 0 4px;
+  outline: none;
+}
+.find input:focus {
+  border-color: #0078d4;
+}
+.find .count {
+  min-width: 14ch;
+  color: #9d9d9d;
+}

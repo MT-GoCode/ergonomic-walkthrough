@@ -10,6 +10,8 @@ export type State = {
   editingId: string | null
   selectTo: string | null
   defaultLang: string
+  // Collapsed cells shown open, without changing the document: the path to a find match.
+  peek: string[]
   rev: number
   // Cell-level history: each structural action's cells before and after (⌘⇧Z / ⌘⇧Y).
   undo: Step[]
@@ -23,6 +25,7 @@ export type Action =
   | { a: 'focus'; id: string }
   | { a: 'edit'; id: string | null }
   | { a: 'select'; id: string | null }
+  | { a: 'peek'; ids: string[] }
   | { a: 'insert'; id: string; mode: ops.Mode; kind: Kind }
   | { a: 'split'; id: string; at: number; mode: 'same' | 'in'; kind: Kind }
   | { a: 'undo' }
@@ -50,7 +53,10 @@ function afterDelete(before: Cell[], i: number, after: Cell[]): [Cell[], string 
 // Returns the next cells and the next focused id.
 function edit(
   cells: Cell[],
-  act: Exclude<Action, { a: 'init' | 'settings' | 'focus' | 'edit' | 'select' | 'undo' | 'redo' }>,
+  act: Exclude<
+    Action,
+    { a: 'init' | 'settings' | 'focus' | 'edit' | 'select' | 'peek' | 'undo' | 'redo' }
+  >,
   focusId: string | null,
   lang: string
 ): [Cell[], string | null] {
@@ -97,6 +103,7 @@ function step(s: State, act: Action): State {
       editingId: null,
       selectTo: null,
       defaultLang: act.defaultLang,
+      peek: [],
       rev: 0,
       undo: [],
       redo: []
@@ -104,6 +111,10 @@ function step(s: State, act: Action): State {
   if (act.a === 'settings') return { ...s, defaultLang: act.defaultLang }
   if (act.a === 'focus') return { ...s, focusId: act.id }
   if (act.a === 'select') return { ...s, selectTo: act.id }
+  if (act.a === 'peek') return { ...s, peek: act.ids }
+  // Folding a peeked cell just ends its peek; the document already has it collapsed.
+  if (act.a === 'toggle' && s.peek.includes(act.id))
+    return { ...s, peek: s.peek.filter((id) => id !== act.id) }
   if (act.a === 'undo') {
     const step = s.undo.at(-1)
     if (!step) return s
@@ -153,6 +164,7 @@ let state: State = {
   editingId: null,
   selectTo: null,
   defaultLang: '',
+  peek: [],
   rev: 0,
   undo: [],
   redo: []
